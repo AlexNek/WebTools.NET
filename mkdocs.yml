@@ -1,0 +1,94 @@
+site_name: WebTools.NET Developer Manual
+site_description: Developer manual for WebTools.NET — web search, browser content fetching, and navigation for .NET agents
+site_url: https://canteenmanager.github.io/WebTools.NET/
+repo_url: https://github.com/CanteenManager/WebTools.NET
+repo_name: CanteenManager/WebTools.NET
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quick-start.md
+      - Dependency Injection: getting-started/dependency-injection.md
+  - Concepts:
+      - Browser Engines: concepts/browser-engines.md
+      - Error Handling: concepts/error-handling.md
+  - Web Search:
+      - Overview: search/overview.md
+      - Search Providers: search/providers.md
+      - WebSearchAgent: search/web-search-agent.md
+  - Content Fetching:
+      - Overview: content-fetching/overview.md
+      - URL Reachability: content-fetching/url-reachability.md
+  - Navigation:
+      - WebNavigationAgent: navigation/web-navigation-agent.md
+      - Geo-awareness: navigation/geo-region.md
+  - API Reference:
+      - Core Interfaces: api-reference/interfaces.md
+      - Models: api-reference/models.md
+      - DI Extensions: api-reference/di-extensions.md
+  - FAQ: faq.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.keys
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/CanteenManager/WebTools.NET

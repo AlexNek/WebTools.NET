@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-13
+
 ### Added
 
 - URL reachability checking via `WebAccessService` (plain HTTP, redirect tracking)
@@ -21,5 +23,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions workflow for CI build, test, and NuGet publish on tag
 - Demo project showing all library features
 - Unit tests with xUnit, FluentAssertions, and NSubstitute
+- Developer manual published as a documentation site via MkDocs Material and GitHub Pages
 
-[Unreleased]: https://github.com/CanteenManager/WebTools.NET/compare/HEAD
