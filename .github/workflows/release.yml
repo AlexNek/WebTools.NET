@@ -1,3 +1,4 @@
+name: Release & Publish NuGet
 # Release pipeline for the WebTools.NET NuGet package.
 #
 # On a v* tag push it builds, tests, packs and then publishes to:
@@ -7,7 +8,6 @@
 #
 # workflow_dispatch ("Run workflow" button) runs build/test/pack ONLY;
 # the publish job is skipped by design because it requires a v* tag.
-name: Release & Publish NuGet
 
 on:
   push:
