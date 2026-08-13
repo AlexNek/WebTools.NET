@@ -1,19 +1,28 @@
 name: Release & Publish NuGet
 # Release pipeline for the WebTools.NET NuGet package.
 #
-# On a v* tag push it builds, tests, packs and then publishes to:
+# Builds, tests, packs and then publishes to:
 #   1. NuGet.org      -> https://www.nuget.org/packages/WebTools.NET
 #                        (requires repository secret NUGET_API_KEY)
 #   2. GitHub Release -> tag page with the .nupkg attached
 #
-# workflow_dispatch ("Run workflow" button) runs build/test/pack ONLY;
-# the publish job is skipped by design because it requires a v* tag.
+# Two ways to start it:
+#   - push a v* tag  -> base version comes from the tag (v1.2.3 -> 1.2.3)
+#   - Run workflow   -> type the base version into the "version" input
+# In both cases GitVersion's commit count since the last tag (CommitsSince-
+# VersionSource) is appended as build number unless HEAD is the tag itself:
+# <base>.<commits since tag>, e.g. 1.0.0.12. The GitHub Release creates the
+# v<version> tag for manual runs.
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Base version to publish, e.g. 1.0.0 (tag pushes use the tag instead)'
+        required: true
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -23,6 +32,8 @@ env:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,17 +61,30 @@ jobs:
           echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
           echo "NuGetVersion: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
 
+      # Base version: typed input for manual runs, GitVersion otherwise.
+      # GitVersion's CommitsSinceVersionSource is appended as build number:
+      # 1.0.0 + 12 commits since tag -> 1.0.0.12
+      - name: Determine effective version
+        id: version
+        run: |
+          BASE="${{ github.event.inputs.version }}"
+          if [ -z "$BASE" ]; then BASE="${{ steps.gitversion.outputs.majorMinorPatch }}"; fi
+          COUNT="${{ steps.gitversion.outputs.commitsSinceVersionSource }}"
+          if [ "$COUNT" -gt 0 ]; then VERSION="$BASE.$COUNT"; else VERSION="$BASE"; fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Effective version: $VERSION ($COUNT commit(s) since version source)"
+
       - name: Restore
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.gitversion.outputs.nuGetVersionV2 }}
+        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.version.outputs.value }}
 
       - name: Test
         run: dotnet test ${{ env.TEST_PATH }} --configuration Release --no-build --verbosity normal --filter "Category!=Integration"
 
       - name: Pack
-        run: dotnet pack ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./nupkg /p:PackageVersion=${{ steps.gitversion.outputs.nuGetVersionV2 }}
+        run: dotnet pack ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./nupkg /p:PackageVersion=${{ steps.version.outputs.value }}
 
       - name: Upload NuGet artifact
         uses: actions/upload-artifact@v4
@@ -68,12 +92,10 @@ jobs:
           name: nuget-packages
           path: ./nupkg/*.nupkg
 
-  publish:
+  # Publishes the packed .nupkg to NuGet.org.
+  publish-nuget:
     needs: build-and-test
     runs-on: ubuntu-latest
-    # Skipped unless triggered by a v* tag push.
-    # Manual workflow_dispatch runs are for build/test verification only.
-    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download NuGet artifact
         uses: actions/download-artifact@v4
@@ -96,17 +118,24 @@ jobs:
           echo "Settings -> Secrets and variables -> Actions, then re-run this release."
           exit 1
 
-      - name: Announce publish targets
-        run: |
-          echo "Publishing WebTools.NET (${{ github.ref_name }}) to:"
-          echo "  1. NuGet.org      -> https://www.nuget.org/packages/WebTools.NET"
-          echo "  2. GitHub Release -> tag ${{ github.ref_name }}"
-
       - name: Publish to NuGet.org
         run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  # Creates the GitHub Release and attaches the .nupkg.
+  # For manual runs this also creates the v<version> tag at the current commit.
+  publish-github-release:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download NuGet artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./nupkg
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.build-and-test.outputs.version }}
           generate_release_notes: true
           files: ./nupkg/*.nupkg
