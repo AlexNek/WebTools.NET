@@ -35,6 +35,16 @@ package, install the Playwright browser binaries once per machine:
 pwsh bin/Debug/net10.0/playwright.ps1 install chromium
 ```
 
+`pwsh` is the executable of **PowerShell Core**, the cross-platform edition of
+PowerShell that ships with the .NET SDK tooling and can be installed
+[standalone](https://learn.microsoft.com/powershell/scripting/install/installing-powershell).
+On Windows, if you only have the classic Windows PowerShell, run the same
+script with `powershell` instead:
+
+```powershell
+powershell bin/Debug/net10.0/playwright.ps1 install chromium
+```
+
 Adjust the path to your build output folder (e.g. `bin/Release/net10.0/`). The
 script is provided by the `Microsoft.Playwright` dependency that WebTools.NET
 pulls in transitively.
