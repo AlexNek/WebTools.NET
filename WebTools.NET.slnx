@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="WebTools.NET.Demo/WebTools.NET.Demo.csproj" />
+  <Project Path="WebTools.NET.Tests/WebTools.NET.Tests.csproj" />
+  <Project Path="WebTools.NET/WebTools.NET.csproj" />
+</Solution>

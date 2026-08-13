@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>WebTools.NET</RootNamespace>
+    <AssemblyName>WebTools.NET</AssemblyName>
+
+    <!-- NuGet metadata -->
+    <PackageId>WebTools.NET</PackageId>
+    <Title>WebTools.NET</Title>
+    <Description>Web tools for .NET agents: web search, browser-based content fetching, and navigation.</Description>
+    <Authors>CanteenManager</Authors>
+    <PackageTags>web;search;browser;playwright;agent;tools;dotnet</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+
+    <!-- Repository metadata -->
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <RepositoryUrl>https://github.com/CanteenManager/WebTools.NET</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/CanteenManager/WebTools.NET</PackageProjectUrl>
+
+    <!-- Symbols / CI -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- Pack README and icon -->
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="assets\icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Playwright" Version="1.61.0" />
+    <PackageReference Include="CloakBrowser" Version="0.4.5" />
+  </ItemGroup>
+
+</Project>
