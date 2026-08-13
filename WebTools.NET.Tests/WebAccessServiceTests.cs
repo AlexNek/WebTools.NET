@@ -1,3 +1,5 @@
+using System.Net;
+
 using FluentAssertions;
 
 using WebTools.NET;
@@ -9,18 +11,20 @@ namespace WebTools.NET.Tests;
 
 public class WebAccessServiceTests : IDisposable
 {
-    private readonly WebAccessService _sut = new();
+    private WebAccessService? _sut;
 
-    public void Dispose() => _sut.Dispose();
+    public void Dispose() => _sut?.Dispose();
 
     [Fact]
     public async Task CheckReachabilityAsync_ReachableUrl_ReturnsSuccess()
     {
         // Arrange
-        var url = "https://httpbin.org/status/200";
+        var handler = new FakeHttpMessageHandler(HttpStatusCode.OK, "hello");
+        var httpClient = new HttpClient(handler);
+        _sut = new WebAccessService(httpClient);
 
         // Act
-        var result = await _sut.CheckReachabilityAsync(url);
+        var result = await _sut.CheckReachabilityAsync("https://test.example.com/page");
 
         // Assert
         result.Reachable.Should().BeTrue();
@@ -32,10 +36,12 @@ public class WebAccessServiceTests : IDisposable
     public async Task CheckReachabilityAsync_NotFoundUrl_ReturnsNotReachable()
     {
         // Arrange
-        var url = "https://httpbin.org/status/404";
+        var handler = new FakeHttpMessageHandler(HttpStatusCode.NotFound, "not found");
+        var httpClient = new HttpClient(handler);
+        _sut = new WebAccessService(httpClient);
 
         // Act
-        var result = await _sut.CheckReachabilityAsync(url);
+        var result = await _sut.CheckReachabilityAsync("https://test.example.com/missing");
 
         // Assert
         result.Reachable.Should().BeFalse();
@@ -46,11 +52,29 @@ public class WebAccessServiceTests : IDisposable
     [Fact]
     public async Task CheckReachabilityAsync_RedirectUrl_FollowsRedirectAndReportsCount()
     {
-        // Arrange
-        var url = "https://httpbin.org/redirect/2";
+        // Arrange — simulate 2 redirects then a 200
+        var callCount = 0;
+        var handler = new FakeHttpMessageHandler(request =>
+        {
+            callCount++;
+            if (callCount <= 2)
+            {
+                var resp = new HttpResponseMessage(HttpStatusCode.Found);
+                resp.Headers.Location = new Uri("https://test.example.com/final");
+                return resp;
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("done"),
+                RequestMessage = request
+            };
+        });
+        var httpClient = new HttpClient(handler);
+        _sut = new WebAccessService(httpClient);
 
         // Act
-        var result = await _sut.CheckReachabilityAsync(url);
+        var result = await _sut.CheckReachabilityAsync("https://test.example.com/start");
 
         // Assert
         result.Reachable.Should().BeTrue();
@@ -61,11 +85,14 @@ public class WebAccessServiceTests : IDisposable
     [Fact]
     public async Task CheckReachabilityAsync_InvalidDomain_ReturnsErrorMessage()
     {
-        // Arrange
-        var url = "https://this-domain-definitely-does-not-exist-xyz999.com";
+        // Arrange — simulate DNS failure
+        var handler = new FakeHttpMessageHandler(_ =>
+            throw new HttpRequestException("No such host is known."));
+        var httpClient = new HttpClient(handler);
+        _sut = new WebAccessService(httpClient);
 
         // Act
-        var result = await _sut.CheckReachabilityAsync(url);
+        var result = await _sut.CheckReachabilityAsync("https://this-domain-definitely-does-not-exist-xyz999.com");
 
         // Assert
         result.Reachable.Should().BeFalse();
@@ -76,12 +103,15 @@ public class WebAccessServiceTests : IDisposable
     [Fact]
     public async Task CheckReachabilityAsync_CancelledToken_ThrowsOrReturnsTimeout()
     {
-        // Arrange
-        var url = "https://httpbin.org/delay/10";
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        // Arrange — simulate a timeout via already-cancelled token
+        var handler = new FakeHttpMessageHandler(_ =>
+            throw new TaskCanceledException("The operation was canceled."));
+        var httpClient = new HttpClient(handler);
+        _sut = new WebAccessService(httpClient);
+        using var cts = new CancellationTokenSource();
 
         // Act
-        var result = await _sut.CheckReachabilityAsync(url, cts.Token);
+        var result = await _sut.CheckReachabilityAsync("https://test.example.com/slow", cts.Token);
 
         // Assert
         result.Reachable.Should().BeFalse();

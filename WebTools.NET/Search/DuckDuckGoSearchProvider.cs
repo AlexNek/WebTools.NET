@@ -41,6 +41,10 @@ public sealed partial class DuckDuckGoSearchProvider : IWebSearchProvider, IDisp
         {
             var url = $"https://html.duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
             using var resp = await _http.GetAsync(url, ct);
+
+            if (!resp.IsSuccessStatusCode)
+                return new SearchResult(false, [], $"HTTP {(int)resp.StatusCode}");
+
             var html = await resp.Content.ReadAsStringAsync(ct);
             var results = ParseResults(html, maxResults);
             return new SearchResult(true, results, null);

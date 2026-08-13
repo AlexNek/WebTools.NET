@@ -11,11 +11,27 @@ namespace WebTools.NET.Tests;
 
 public class DuckDuckGoSearchProviderTests
 {
+    private const string FakeHtmlWithResults = """
+        <html><body>
+        <a rel="nofollow" class="result__a" href="https://test.example.com/page1">
+            <span>Result One Title</span>
+        </a>
+        <a rel="nofollow" class="result__a" href="https://test.example.com/page2">
+            <span>Result Two Title</span>
+        </a>
+        <a rel="nofollow" class="result__a" href="https://test.example.com/page3">
+            <span>Result Three Title</span>
+        </a>
+        </body></html>
+        """;
+
     [Fact]
-    public async Task SearchAsync_WithValidQuery_ReturnsResults()
+    public async Task SearchAsync_WithValidResponse_ReturnsResults()
     {
         // Arrange
-        using var sut = new DuckDuckGoSearchProvider();
+        var fakeHandler = new FakeHttpMessageHandler(HttpStatusCode.OK, FakeHtmlWithResults);
+        var httpClient = new HttpClient(fakeHandler);
+        using var sut = new DuckDuckGoSearchProvider(httpClient);
 
         // Act
         var result = await sut.SearchAsync("dotnet", maxResults: 3);
@@ -34,7 +50,9 @@ public class DuckDuckGoSearchProviderTests
     public async Task SearchAsync_WithMaxResults_RespectsLimit()
     {
         // Arrange
-        using var sut = new DuckDuckGoSearchProvider();
+        var fakeHandler = new FakeHttpMessageHandler(HttpStatusCode.OK, FakeHtmlWithResults);
+        var httpClient = new HttpClient(fakeHandler);
+        using var sut = new DuckDuckGoSearchProvider(httpClient);
         const int maxResults = 2;
 
         // Act

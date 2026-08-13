@@ -35,6 +35,11 @@ public sealed class WebAccessService : IWebAccessService, IDisposable
         _httpClient.DefaultRequestHeaders.Add("Upgrade-Insecure-Requests", "1");
     }
 
+    internal WebAccessService(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
+
     public async Task<UrlCheckResult> CheckReachabilityAsync(
         string url,
         CancellationToken ct = default)
