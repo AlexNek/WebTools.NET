@@ -87,7 +87,9 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Check NuGet API key
-        if: ${{ secrets.NUGET_API_KEY == '' }}
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        if: ${{ env.NUGET_API_KEY == '' }}
         run: |
           echo "::error::NUGET_API_KEY repository secret is not set."
           echo "Create an API key on nuget.org and add it under"
