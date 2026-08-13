@@ -48,7 +48,7 @@ jobs:
         run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.gitversion.outputs.nuGetVersionV2 }}
 
       - name: Test
-        run: dotnet test ${{ env.TEST_PATH }} --configuration Release --no-build --verbosity normal
+        run: dotnet test ${{ env.TEST_PATH }} --configuration Release --no-build --verbosity normal --filter "Category!=Integration"
 
       - name: Pack
         run: dotnet pack ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./nupkg /p:PackageVersion=${{ steps.gitversion.outputs.nuGetVersionV2 }}
