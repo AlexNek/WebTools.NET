@@ -1,79 +1,40 @@
-using System.Text.RegularExpressions;
-
 using Microsoft.Playwright;
 
 using WebTools.NET.Abstractions;
+using WebTools.NET.Internal;
 using WebTools.NET.Models;
 
 namespace WebTools.NET.Browsing;
 
-public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyncDisposable
+public sealed class PlaywrightContentFetcher : IWebContentFetcher
 {
     private const string BrowserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 
+    private const string ChallengeWaitScript =
+        "() => document.title !== 'Just a moment...' && " +
+        "!document.body.textContent.includes('cf-browser-verification')";
+
+    private const int ChallengeWaitMs = 30_000;
+
+    private const int ContentLimit = 8000;
+
+    private const int ErrorContentLimit = 3000;
+
+    private const int FallbackNetworkIdleWaitMs = 10_000;
+
     private const int FallbackTimeoutMs = 90_000;
 
-    private static readonly string[] StealthScript =
-        [
-            // Overwrite the `navigator.webdriver` property to undefined
-            "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });",
+    private const int FetchGotoTimeoutMs = 20_000;
 
-            // Remove Chrome automation extensions
-            "window.chrome = { runtime: {}, csi: function() {}, loadTimes: function() {} };",
+    private const int GotoTimeoutMs = 15_000;
 
-            // Override permissions
-            "const originalQuery = window.navigator.permissions.query;",
-            "window.navigator.permissions.query = (parameters) => (",
-            "    parameters.name === 'notifications' ?",
-            "        Promise.resolve({ state: Notification.permission }) :",
-            "        originalQuery(parameters)",
-            ");",
+    private const int NetworkIdleWaitMs = 5_000;
 
-            // WebGL vendor/renderer spoofing (common bot detection vector)
-            "const getParameter = WebGLRenderingContext.prototype.getParameter;",
-            "WebGLRenderingContext.prototype.getParameter = function(param) {",
-            "    if (param === 37445) return 'Intel Inc.';",
-            "    if (param === 37446) return 'Intel Iris Xe Graphics';",
-            "    return getParameter.call(this, param);",
-            "};",
+    private const string PlaywrightNotInstalledMessage =
+        "Playwright browsers not installed. Run: playwright install (or .\\playwright.ps1 install)";
 
-            // Plugins spoofing - realistic plugin list
-            "Object.defineProperty(navigator, 'plugins', {",
-            "    get: () => {",
-            "        const plugins = [];",
-            "        const names = ['PDF Viewer', 'Chrome PDF Viewer', 'Chromium PDF Viewer',",
-            "                       'Microsoft Edge PDF Viewer', 'WebKit built-in PDF',",
-            "                       'Widevine Content Decryption Module', 'Widevine Content Decryption Module'];",
-            "        for (let i = 0; i < names.length; i++) {",
-            "            plugins.push({",
-            "                name: names[i],",
-            "                filename: names[i].replace(/ /g, '_') + '.plugin'",
-            "            });",
-            "        }",
-            "        return plugins;",
-            "    }",
-            "});",
-
-            // Languages and hardware concurrency
-            "Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });",
-            "Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });",
-            "Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });",
-            "Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 0 });",
-
-            // Screen properties
-            "Object.defineProperty(screen, 'colorDepth', { get: () => 24 });",
-            "Object.defineProperty(screen, 'pixelDepth', { get: () => 24 });",
-
-            // Override toString/functions to avoid detection
-            "const originalToString = Function.prototype.toString;",
-            "Function.prototype.toString = function() {",
-            "    if (this === navigator.permissions.query) {",
-            "        return 'function query() { [native code] }';",
-            "    }",
-            "    return originalToString.call(this);",
-            "};"
-        ];
+    private readonly bool _allowVisibleFallback;
 
     private readonly SemaphoreSlim _fallbackLock = new(1, 1);
 
@@ -87,9 +48,16 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
 
     private IPlaywright? _playwright;
 
-    public PlaywrightContentFetcher(bool headless = true)
+    /// <param name="headless">Run the browser headless (default).</param>
+    /// <param name="allowVisibleFallback">
+    /// When true, a visible (non-headless) browser window may be opened as a last-resort
+    /// fallback for pages stuck behind bot challenges. Off by default — popping a window
+    /// is hostile to server/service contexts.
+    /// </param>
+    public PlaywrightContentFetcher(bool headless = true, bool allowVisibleFallback = false)
     {
         _headless = headless;
+        _allowVisibleFallback = allowVisibleFallback;
     }
 
     public async Task<UrlCheckResult> CheckReachabilityAsync(
@@ -100,14 +68,14 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
         try
         {
             var context = await GetContextAsync(ct);
-            page = await context.NewPageAsync();
-            await ApplyStealthForModeAsync(page);
+            page = await CreateStealthPageAsync(context);
 
             var response = await page.GotoAsync(
                                url,
                                new PageGotoOptions
                                    {
-                                       WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 15000
+                                       WaitUntil = WaitUntilState.DOMContentLoaded,
+                                       Timeout = GotoTimeoutMs
                                    });
 
             var status = response?.Status ?? 0;
@@ -116,32 +84,8 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
             if (status == 403)
             {
                 await page.CloseAsync().ConfigureAwait(false);
-                page = null;
-
-                page = await context.NewPageAsync();
-                await ApplyStealthForModeAsync(page);
-
-                try
-                {
-                    await page.GotoAsync(
-                        "https://www.google.com",
-                        new PageGotoOptions
-                            {
-                                WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 8000
-                            });
-                    await Task.Delay(300, ct);
-                }
-                catch
-                {
-                    // warmup failed — proceed anyway
-                }
-
-                response = await page.GotoAsync(
-                               url,
-                               new PageGotoOptions
-                                   {
-                                       WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 15000
-                                   });
+                page = await CreateStealthPageAsync(context);
+                response = await BrowserHelpers.WarmupAndGotoAsync(page, url, GotoTimeoutMs, ct);
 
                 status = response?.Status ?? 0;
                 finalUrl = page.Url;
@@ -150,10 +94,20 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
             // After retry still blocked — try non-headless fallback for Cloudflare
             if (status is 403 or 429 && await IsBotChallengePageAsync(page))
             {
+                if (!_allowVisibleFallback)
+                {
+                    return new UrlCheckResult(
+                        false,
+                        status,
+                        "Blocked by bot protection",
+                        FinalUrl: finalUrl,
+                        ProtectionType: "Cloudflare");
+                }
+
                 return await NonHeadlessReachabilityFallbackAsync(url, ct);
             }
 
-            if (status >= 200 && status < 300 && IsErrorPageUrl(finalUrl))
+            if (status >= 200 && status < 300 && HtmlUtils.IsErrorPageUrl(finalUrl))
             {
                 return new UrlCheckResult(
                     false,
@@ -175,7 +129,10 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
         }
         catch (PlaywrightException ex)
         {
-            return new UrlCheckResult(false, null, NormalizePlaywrightError(ex));
+            return new UrlCheckResult(
+                false,
+                null,
+                BrowserHelpers.NormalizePlaywrightError(ex, PlaywrightNotInstalledMessage));
         }
         finally
         {
@@ -209,14 +166,14 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
         try
         {
             var context = await GetContextAsync(ct);
-            page = await context.NewPageAsync();
-            await ApplyStealthForModeAsync(page);
+            page = await CreateStealthPageAsync(context);
 
             var response = await page.GotoAsync(
                                url,
                                new PageGotoOptions
                                    {
-                                       WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 20000
+                                       WaitUntil = WaitUntilState.DOMContentLoaded,
+                                       Timeout = FetchGotoTimeoutMs
                                    });
 
             var status = response?.Status ?? 0;
@@ -225,32 +182,8 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
             if (status == 403)
             {
                 await page.CloseAsync().ConfigureAwait(false);
-                page = null;
-
-                page = await context.NewPageAsync();
-                await ApplyStealthForModeAsync(page);
-
-                try
-                {
-                    await page.GotoAsync(
-                        "https://www.google.com",
-                        new PageGotoOptions
-                            {
-                                WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 8000
-                            });
-                    await Task.Delay(300, ct);
-                }
-                catch
-                {
-                    // warmup failed — proceed anyway
-                }
-
-                response = await page.GotoAsync(
-                               url,
-                               new PageGotoOptions
-                                   {
-                                       WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 15000
-                                   });
+                page = await CreateStealthPageAsync(context);
+                response = await BrowserHelpers.WarmupAndGotoAsync(page, url, GotoTimeoutMs, ct);
 
                 status = response?.Status ?? 0;
                 finalUrl = page.Url;
@@ -259,6 +192,11 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
             // If still Cloudflare-blocked after retry, try non-headless fallback
             if (status == 403 && await IsBotChallengePageAsync(page))
             {
+                if (!_allowVisibleFallback)
+                {
+                    return new WebContent(false, "", "Blocked by bot protection", finalUrl);
+                }
+
                 return await NonHeadlessFetchFallbackAsync(url, ct);
             }
 
@@ -268,7 +206,7 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
             {
                 await page.WaitForLoadStateAsync(
                     LoadState.NetworkIdle,
-                    new PageWaitForLoadStateOptions { Timeout = 5000 });
+                    new PageWaitForLoadStateOptions { Timeout = NetworkIdleWaitMs });
             }
             catch (TimeoutException)
             {
@@ -279,28 +217,29 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
             status = response?.Status ?? 0;
             var body = await page.TextContentAsync("body") ?? "";
 
-            if (IsErrorPageUrl(finalUrl) && status >= 200 && status < 300)
+            if (HtmlUtils.IsErrorPageUrl(finalUrl) && status >= 200 && status < 300)
             {
-                var text = StripHtml(body);
                 return new WebContent(
                     false,
-                    Truncate(text, 3000),
+                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
                     $"Redirected to error page ({finalUrl})",
                     finalUrl);
             }
 
             if (status < 200 || status >= 300)
             {
-                var text = StripHtml(body);
                 return new WebContent(
                     false,
-                    Truncate(text, 3000),
+                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
                     $"HTTP {status}",
                     finalUrl);
             }
 
-            var content = StripHtml(body);
-            return new WebContent(true, Truncate(content, 8000), null, finalUrl);
+            return new WebContent(
+                true,
+                HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ContentLimit),
+                null,
+                finalUrl);
         }
         catch (TimeoutException)
         {
@@ -308,7 +247,11 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
         }
         catch (PlaywrightException ex)
         {
-            return new WebContent(false, "", NormalizePlaywrightError(ex), url);
+            return new WebContent(
+                false,
+                "",
+                BrowserHelpers.NormalizePlaywrightError(ex, PlaywrightNotInstalledMessage),
+                url);
         }
         finally
         {
@@ -319,48 +262,19 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
         }
     }
 
-    private static async Task ApplyMinimalStealthAsync(IPage page)
+    private async Task<IPage> CreateStealthPageAsync(IBrowserContext context)
     {
+        var page = await context.NewPageAsync();
         try
         {
-            // Minimal stealth: only override the most commonly-checked property.
-            // Heavy stealth scripts (WebGL/plugin/spoofing) can paradoxically
-            // increase bot detection likelihood with advanced scanners.
-            await page.AddInitScriptAsync(
-                "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });");
+            await page.AddInitScriptAsync(StealthScripts.ForMode(_headless));
         }
         catch
         {
             // stealth injection failed — continue anyway
         }
-    }
 
-    private static async Task ApplyStealthAsync(IPage page)
-    {
-        try
-        {
-            var script = string.Join("\n", StealthScript);
-            await page.AddInitScriptAsync(script);
-        }
-        catch
-        {
-            // stealth injection failed — continue anyway
-        }
-    }
-
-    private async Task ApplyStealthForModeAsync(IPage page)
-    {
-        if (_headless)
-        {
-            // Headless: use full stealth (more overrides needed)
-            await ApplyStealthForModeAsync(page);
-        }
-        else
-        {
-            // Non-headless: minimal stealth only — the visible browser window
-            // already looks legitimate; heavy overrides trigger Cloudflare
-            await ApplyMinimalStealthAsync(page);
-        }
+        return page;
     }
 
     private async Task<IBrowserContext> GetContextAsync(CancellationToken ct)
@@ -439,76 +353,15 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
         }
     }
 
-    private static bool IsErrorPageUrl(string url) =>
-        url.Contains("/notfound", StringComparison.OrdinalIgnoreCase) ||
-        url.Contains("/error", StringComparison.OrdinalIgnoreCase) ||
-        url.Contains("/404", StringComparison.OrdinalIgnoreCase);
-
-    private async Task<WebContent> NonHeadlessFetchFallbackAsync(string url, CancellationToken ct)
+    private Task<WebContent> NonHeadlessFetchFallbackAsync(string url, CancellationToken ct)
     {
-        await _fallbackLock.WaitAsync(ct);
-        try
-        {
-            var playwright = await Playwright.CreateAsync();
-            var browser = await playwright.Chromium.LaunchAsync(
-                              new BrowserTypeLaunchOptions
-                                  {
-                                      Headless = false,
-                                      Args =
-                                          [
-                                              "--disable-blink-features=AutomationControlled",
-                                              "--disable-extensions",
-                                              "--no-sandbox"
-                                          ]
-                                  });
-
-            var context = await browser.NewContextAsync(
-                              new BrowserNewContextOptions
-                                  {
-                                      UserAgent = BrowserUserAgent,
-                                      Locale = "en-US",
-                                      TimezoneId = "America/New_York",
-                                      ViewportSize =
-                                          new ViewportSize { Width = 1920, Height = 1080 },
-                                      BypassCSP = true,
-                                      JavaScriptEnabled = true
-                                  });
-
-            var page = await context.NewPageAsync();
-            await ApplyMinimalStealthAsync(page);
-            try
+        return WithNonHeadlessBrowserAsync(
+            url,
+            ct,
+            async (page, status, finalUrl, challenged) =>
             {
-                var response = await page.GotoAsync(
-                                   url,
-                                   new PageGotoOptions
-                                       {
-                                           WaitUntil = WaitUntilState.DOMContentLoaded,
-                                           Timeout = FallbackTimeoutMs
-                                       });
-
-                var status = response?.Status ?? 0;
-                var finalUrl = page.Url;
-
-                // If Cloudflare challenge detected, wait for it to resolve
-                if (status == 403 || await IsBotChallengePageAsync(page))
-                {
-                    try
-                    {
-                        await page.WaitForFunctionAsync(
-                            "() => document.title !== 'Just a moment...' && " +
-                            "!document.body.textContent.includes('cf-browser-verification')",
-                            new PageWaitForFunctionOptions { Timeout = 30_000 });
-                        status = response?.Status ?? 0;
-                        finalUrl = page.Url;
-                    }
-                    catch (TimeoutException)
-                    {
-                        // challenge didn't resolve
-                    }
-                }
-
-                // If still challenged, fail
-                if (await IsBotChallengePageAsync(page))
+                // If Cloudflare challenge detected and unresolved, fail
+                if (challenged)
                 {
                     return new WebContent(false, "", "Blocked by bot protection", finalUrl);
                 }
@@ -517,7 +370,7 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
                 {
                     await page.WaitForLoadStateAsync(
                         LoadState.NetworkIdle,
-                        new PageWaitForLoadStateOptions { Timeout = 10_000 });
+                        new PageWaitForLoadStateOptions { Timeout = FallbackNetworkIdleWaitMs });
                 }
                 catch (TimeoutException)
                 {
@@ -525,39 +378,65 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
                 }
 
                 finalUrl = page.Url;
-                status = response?.Status ?? 0;
                 var body = await page.TextContentAsync("body") ?? "";
 
                 if (status < 200 || status >= 300)
                 {
-                    var text = StripHtml(body);
                     return new WebContent(
                         false,
-                        Truncate(text, 3000),
+                        HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
                         $"HTTP {status}",
                         finalUrl);
                 }
 
-                var content = StripHtml(body);
-                return new WebContent(true, Truncate(content, 8000), null, finalUrl);
-            }
-            finally
-            {
-                await page.CloseAsync().ConfigureAwait(false);
-                await context.CloseAsync();
-                await browser.CloseAsync();
-                playwright.Dispose();
-            }
-        }
-        finally
-        {
-            _fallbackLock.Release();
-        }
+                return new WebContent(
+                    true,
+                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ContentLimit),
+                    null,
+                    finalUrl);
+            });
     }
 
-    private async Task<UrlCheckResult> NonHeadlessReachabilityFallbackAsync(
+    private Task<UrlCheckResult> NonHeadlessReachabilityFallbackAsync(
         string url,
         CancellationToken ct)
+    {
+        return WithNonHeadlessBrowserAsync(
+            url,
+            ct,
+            (page, status, finalUrl, challenged) =>
+            {
+                if (!challenged && status >= 200 && status < 400)
+                {
+                    return Task.FromResult(new UrlCheckResult(true, status, null, FinalUrl: finalUrl));
+                }
+
+                if (challenged)
+                {
+                    return Task.FromResult(
+                        new UrlCheckResult(
+                            false,
+                            status,
+                            "Blocked by bot protection",
+                            FinalUrl: finalUrl,
+                            ProtectionType: "Cloudflare"));
+                }
+
+                return Task.FromResult(
+                    new UrlCheckResult(false, status, $"HTTP {status}", FinalUrl: finalUrl));
+            });
+    }
+
+    /// <summary>
+    /// Launches a visible browser, navigates to <paramref name="url"/> and waits for a
+    /// possible bot challenge to resolve, then invokes <paramref name="actionAsync"/>
+    /// with the page, the normalized status, the final URL and whether the page is
+    /// still on a challenge page. Browser resources are always cleaned up afterwards.
+    /// </summary>
+    private async Task<T> WithNonHeadlessBrowserAsync<T>(
+        string url,
+        CancellationToken ct,
+        Func<IPage, int, string, bool, Task<T>> actionAsync)
     {
         await _fallbackLock.WaitAsync(ct);
         try
@@ -588,7 +467,17 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
                                   });
 
             var page = await context.NewPageAsync();
-            await ApplyMinimalStealthAsync(page);
+            try
+            {
+                // Non-headless: minimal stealth only — the visible browser window
+                // already looks legitimate; heavy overrides trigger Cloudflare
+                await page.AddInitScriptAsync(StealthScripts.Minimal);
+            }
+            catch
+            {
+                // stealth injection failed — continue anyway
+            }
+
             try
             {
                 var response = await page.GotoAsync(
@@ -602,35 +491,32 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
                 var status = response?.Status ?? 0;
                 var finalUrl = page.Url;
 
-                // Wait for Cloudflare challenge to resolve (up to 30s)
-                if (status == 403 || await IsBotChallengePageAsync(page))
+                // Wait for a possible bot challenge to resolve (up to ChallengeWaitMs)
+                var challenged = status == 403 || await IsBotChallengePageAsync(page);
+                if (challenged)
                 {
                     try
                     {
                         await page.WaitForFunctionAsync(
-                            "() => document.title !== 'Just a moment...' && " +
-                            "!document.body.textContent.includes('cf-browser-verification')",
-                            new PageWaitForFunctionOptions { Timeout = 30_000 });
-                        status = response?.Status ?? 0;
+                            ChallengeWaitScript,
+                            new PageWaitForFunctionOptions { Timeout = ChallengeWaitMs });
                         finalUrl = page.Url;
                     }
                     catch (TimeoutException)
                     {
-                        // Challenge didn't resolve
+                        // challenge didn't resolve
                     }
                 }
 
-                if (status >= 200 && status < 400 && !await IsBotChallengePageAsync(page))
+                var stillChallenged = await IsBotChallengePageAsync(page);
+                if (challenged && !stillChallenged)
                 {
-                    return new UrlCheckResult(true, status, null, FinalUrl: finalUrl);
+                    // The original response was the challenge interstitial —
+                    // the page actually loaded once the challenge cleared.
+                    status = BrowserHelpers.NormalizeStatusAfterChallenge(status, true);
                 }
 
-                return new UrlCheckResult(
-                    false,
-                    status,
-                    "Blocked by bot protection",
-                    FinalUrl: finalUrl,
-                    ProtectionType: "Cloudflare");
+                return await actionAsync(page, status, finalUrl, stillChallenged);
             }
             finally
             {
@@ -645,34 +531,4 @@ public sealed partial class PlaywrightContentFetcher : IWebContentFetcher, IAsyn
             _fallbackLock.Release();
         }
     }
-
-    private static string NormalizePlaywrightError(PlaywrightException ex)
-    {
-        if (ex.Message.Contains("Executable doesn't exist", StringComparison.Ordinal))
-        {
-            return
-                "Playwright browsers not installed. Run: playwright install (or .\\playwright.ps1 install)";
-        }
-
-        return ex.Message;
-    }
-
-    private static string StripHtml(string html)
-    {
-        if (string.IsNullOrWhiteSpace(html))
-        {
-            return "";
-        }
-
-        return WhitespaceRegex().Replace(TagRegex().Replace(html, " "), " ").Trim();
-    }
-
-    [GeneratedRegex(@"<[^>]+>")]
-    private static partial Regex TagRegex();
-
-    private static string Truncate(string text, int maxLen) =>
-        text.Length <= maxLen ? text : text[..maxLen] + "\n... [truncated]";
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex WhitespaceRegex();
 }

@@ -2,7 +2,7 @@ using System.Net;
 
 using FluentAssertions;
 
-using WebTools.NET;
+using WebTools.NET.Geo;
 
 using Xunit;
 

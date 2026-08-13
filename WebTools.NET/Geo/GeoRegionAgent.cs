@@ -5,21 +5,34 @@ using Microsoft.Extensions.Logging;
 
 using WebTools.NET.Abstractions;
 
-namespace WebTools.NET;
+namespace WebTools.NET.Geo;
 
-public sealed class GeoRegionAgent : IGeoRegionProvider
+/// <summary>
+/// Detects the current region ("us", "eu", "china" or "intl") via a Geo-IP lookup,
+/// falling back to the system UI culture. The result is cached after first detection.
+/// </summary>
+/// <remarks>
+/// The free ip-api.com tier only supports plain HTTP, so the Geo-IP request is not
+/// encrypted and its result should not be treated as authoritative.
+/// </remarks>
+public sealed class GeoRegionAgent : IDisposable, IGeoRegionProvider
 {
     private const string GeoApiUrl = "http://ip-api.com/json/?fields=countryCode";
+
+    private readonly SemaphoreSlim _cacheLock = new(1, 1);
 
     private readonly HttpClient _http;
 
     private readonly ILogger<GeoRegionAgent>? _logger;
 
+    private readonly bool _ownsHttp;
+
     private string? _cached;
 
     public GeoRegionAgent()
-        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(5) })
     {
+        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        _ownsHttp = true;
     }
 
     public GeoRegionAgent(HttpClient http, ILogger<GeoRegionAgent>? logger = null)
@@ -30,17 +43,41 @@ public sealed class GeoRegionAgent : IGeoRegionProvider
 
     public async Task<string> DetectRegionAsync(CancellationToken ct = default)
     {
-        if (_cached is not null)
+        var cached = _cached;
+        if (cached is not null)
         {
-            return _cached;
+            return cached;
         }
 
-        var region = await TryGeoIpAsync(ct)
-                     ?? FallbackToLocale();
+        await _cacheLock.WaitAsync(ct);
+        try
+        {
+            if (_cached is not null)
+            {
+                return _cached;
+            }
 
-        _cached = region;
-        _logger?.LogDebug("Detected region: {Region}", region);
-        return region;
+            var region = await TryGeoIpAsync(ct)
+                         ?? FallbackToLocale();
+
+            _cached = region;
+            _logger?.LogDebug("Detected region: {Region}", region);
+            return region;
+        }
+        finally
+        {
+            _cacheLock.Release();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_ownsHttp)
+        {
+            _http.Dispose();
+        }
+
+        _cacheLock.Dispose();
     }
 
     private static string FallbackToLocale()

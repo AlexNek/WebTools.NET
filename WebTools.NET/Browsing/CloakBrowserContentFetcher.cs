@@ -1,18 +1,28 @@
-using System.Text.RegularExpressions;
-
 using CloakBrowser;
 
 using WebTools.NET.Abstractions;
+using WebTools.NET.Internal;
 using WebTools.NET.Models;
 
 namespace WebTools.NET.Browsing;
 
-public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAsyncDisposable
+public sealed class CloakBrowserContentFetcher : IWebContentFetcher
 {
     private const string BrowserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 
-    private const int FallbackTimeoutMs = 90_000;
+    private const string CloakNotInstalledMessage =
+        "CloakBrowser binary not found. First launch should auto-download, or run: dotnet cloakbrowser install";
+
+    private const int ContentLimit = 8000;
+
+    private const int ErrorContentLimit = 3000;
+
+    private const int FetchGotoTimeoutMs = 20_000;
+
+    private const int GotoTimeoutMs = 15_000;
+
+    private const int NetworkIdleWaitMs = 5_000;
 
     private readonly bool _headless;
 
@@ -45,7 +55,7 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
                                    {
                                        WaitUntil =
                                            Microsoft.Playwright.WaitUntilState.DOMContentLoaded,
-                                       Timeout = 15000
+                                       Timeout = GotoTimeoutMs
                                    });
 
             var status = response?.Status ?? 0;
@@ -54,38 +64,14 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
             if (status == 403)
             {
                 await page.CloseAsync().ConfigureAwait(false);
-                page = null;
-
                 page = await context.NewPageAsync();
-                try
-                {
-                    await page.GotoAsync(
-                        "https://www.google.com",
-                        new Microsoft.Playwright.PageGotoOptions
-                            {
-                                WaitUntil = Microsoft.Playwright.WaitUntilState.DOMContentLoaded,
-                                Timeout = 8000
-                            });
-                    await Task.Delay(300, ct);
-                }
-                catch
-                {
-                }
-
-                response = await page.GotoAsync(
-                               url,
-                               new Microsoft.Playwright.PageGotoOptions
-                                   {
-                                       WaitUntil =
-                                           Microsoft.Playwright.WaitUntilState.DOMContentLoaded,
-                                       Timeout = 15000
-                                   });
+                response = await BrowserHelpers.WarmupAndGotoAsync(page, url, GotoTimeoutMs, ct);
 
                 status = response?.Status ?? 0;
                 finalUrl = page.Url;
             }
 
-            if (status >= 200 && status < 300 && IsErrorPageUrl(finalUrl))
+            if (status >= 200 && status < 300 && HtmlUtils.IsErrorPageUrl(finalUrl))
             {
                 return new UrlCheckResult(
                     false,
@@ -107,7 +93,10 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
         }
         catch (Microsoft.Playwright.PlaywrightException ex)
         {
-            return new UrlCheckResult(false, null, NormalizePlaywrightError(ex));
+            return new UrlCheckResult(
+                false,
+                null,
+                BrowserHelpers.NormalizePlaywrightError(ex, CloakNotInstalledMessage));
         }
         finally
         {
@@ -163,7 +152,7 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
                                    {
                                        WaitUntil =
                                            Microsoft.Playwright.WaitUntilState.DOMContentLoaded,
-                                       Timeout = 20000
+                                       Timeout = FetchGotoTimeoutMs
                                    });
 
             var status = response?.Status ?? 0;
@@ -172,32 +161,8 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
             if (status == 403)
             {
                 await page.CloseAsync().ConfigureAwait(false);
-                page = null;
-
                 page = await context.NewPageAsync();
-                try
-                {
-                    await page.GotoAsync(
-                        "https://www.google.com",
-                        new Microsoft.Playwright.PageGotoOptions
-                            {
-                                WaitUntil = Microsoft.Playwright.WaitUntilState.DOMContentLoaded,
-                                Timeout = 8000
-                            });
-                    await Task.Delay(300, ct);
-                }
-                catch
-                {
-                }
-
-                response = await page.GotoAsync(
-                               url,
-                               new Microsoft.Playwright.PageGotoOptions
-                                   {
-                                       WaitUntil =
-                                           Microsoft.Playwright.WaitUntilState.DOMContentLoaded,
-                                       Timeout = 15000
-                                   });
+                response = await BrowserHelpers.WarmupAndGotoAsync(page, url, GotoTimeoutMs, ct);
 
                 status = response?.Status ?? 0;
                 finalUrl = page.Url;
@@ -207,7 +172,10 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
             {
                 await page.WaitForLoadStateAsync(
                     Microsoft.Playwright.LoadState.NetworkIdle,
-                    new Microsoft.Playwright.PageWaitForLoadStateOptions { Timeout = 5000 });
+                    new Microsoft.Playwright.PageWaitForLoadStateOptions
+                        {
+                            Timeout = NetworkIdleWaitMs
+                        });
             }
             catch (TimeoutException)
             {
@@ -217,28 +185,29 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
             status = response?.Status ?? 0;
             var body = await page.TextContentAsync("body") ?? "";
 
-            if (IsErrorPageUrl(finalUrl) && status >= 200 && status < 300)
+            if (HtmlUtils.IsErrorPageUrl(finalUrl) && status >= 200 && status < 300)
             {
-                var text = StripHtml(body);
                 return new WebContent(
                     false,
-                    Truncate(text, 3000),
+                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
                     $"Redirected to error page ({finalUrl})",
                     finalUrl);
             }
 
             if (status < 200 || status >= 300)
             {
-                var text = StripHtml(body);
                 return new WebContent(
                     false,
-                    Truncate(text, 3000),
+                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
                     $"HTTP {status}",
                     finalUrl);
             }
 
-            var content = StripHtml(body);
-            return new WebContent(true, Truncate(content, 8000), null, finalUrl);
+            return new WebContent(
+                true,
+                HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ContentLimit),
+                null,
+                finalUrl);
         }
         catch (TimeoutException)
         {
@@ -246,7 +215,11 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
         }
         catch (Microsoft.Playwright.PlaywrightException ex)
         {
-            return new WebContent(false, "", NormalizePlaywrightError(ex), url);
+            return new WebContent(
+                false,
+                "",
+                BrowserHelpers.NormalizePlaywrightError(ex, CloakNotInstalledMessage),
+                url);
         }
         finally
         {
@@ -297,39 +270,4 @@ public sealed partial class CloakBrowserContentFetcher : IWebContentFetcher, IAs
             _launchLock.Release();
         }
     }
-
-    private static bool IsErrorPageUrl(string url) =>
-        url.Contains("/notfound", StringComparison.OrdinalIgnoreCase) ||
-        url.Contains("/error", StringComparison.OrdinalIgnoreCase) ||
-        url.Contains("/404", StringComparison.OrdinalIgnoreCase);
-
-    private static string NormalizePlaywrightError(Microsoft.Playwright.PlaywrightException ex)
-    {
-        if (ex.Message.Contains("Executable doesn't exist", StringComparison.Ordinal))
-        {
-            return
-                "CloakBrowser binary not found. First launch should auto-download, or run: dotnet cloakbrowser install";
-        }
-
-        return ex.Message;
-    }
-
-    private static string StripHtml(string html)
-    {
-        if (string.IsNullOrWhiteSpace(html))
-        {
-            return "";
-        }
-
-        return WhitespaceRegex().Replace(TagRegex().Replace(html, " "), " ").Trim();
-    }
-
-    [GeneratedRegex(@"<[^>]+>")]
-    private static partial Regex TagRegex();
-
-    private static string Truncate(string text, int maxLen) =>
-        text.Length <= maxLen ? text : text[..maxLen] + "\n... [truncated]";
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex WhitespaceRegex();
 }

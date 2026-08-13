@@ -7,10 +7,8 @@ using WebTools.NET.Browsing;
 
 namespace WebTools.NET;
 
-public sealed partial class WebNavigationAgent
+public sealed partial class WebNavigationAgent : IAsyncDisposable
 {
-    private static readonly PlaywrightSession DefaultBrowser = new();
-
     private static readonly string[] SkippedPrefixes =
             ["javascript:", "mailto:", "tel:", "#", "whatsapp:", "ftp:"];
 
@@ -18,9 +16,12 @@ public sealed partial class WebNavigationAgent
 
     private readonly ILogger<WebNavigationAgent>? _logger;
 
+    private readonly PlaywrightSession? _ownedBrowser;
+
     public WebNavigationAgent()
-        : this(DefaultBrowser)
     {
+        _ownedBrowser = new PlaywrightSession();
+        _browser = _ownedBrowser;
     }
 
     public WebNavigationAgent(
@@ -31,6 +32,18 @@ public sealed partial class WebNavigationAgent
         _logger = logger;
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        if (_ownedBrowser is not null)
+        {
+            await _ownedBrowser.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Clicks the given selector and returns absolute same-host links found on the
+    /// resulting page (links to other hosts are ignored).
+    /// </summary>
     public async Task<IReadOnlyList<string>> ClickAndExtractAsync(
         string selector,
         int maxLinks = 30,
@@ -65,6 +78,10 @@ public sealed partial class WebNavigationAgent
             .AsReadOnly();
     }
 
+    /// <summary>
+    /// Navigates to <paramref name="startUrl"/> and returns the reachable absolute
+    /// same-host links found on that page (links to other hosts are ignored).
+    /// </summary>
     public async Task<IReadOnlyList<string>> NavigateAsync(
         string startUrl,
         int maxLinks = 30,
@@ -188,7 +205,7 @@ public sealed partial class WebNavigationAgent
     }
 
     [GeneratedRegex(
-        @"<a[^>]+href\s*=\s*""([^""]*)""",
+        @"<a[^>]+href\s*=\s*[""']([^""']*)[""']",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex HrefRegex();
 }

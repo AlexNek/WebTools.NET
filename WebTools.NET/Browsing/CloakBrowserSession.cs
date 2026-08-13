@@ -1,13 +1,22 @@
-using System.Text.RegularExpressions;
-
 using CloakBrowser;
 
 using WebTools.NET.Abstractions;
+using WebTools.NET.Internal;
 
 namespace WebTools.NET.Browsing;
 
-public sealed partial class CloakBrowserSession : IBrowserInteraction
+public sealed class CloakBrowserSession : IBrowserInteraction
 {
+    private const int ClickTimeoutMs = 5000;
+
+    private const int NavigateTimeoutMs = 15000;
+
+    private const int NetworkIdleTimeoutMs = 10000;
+
+    private const int ReachabilityTimeoutMs = 10000;
+
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+
     private Microsoft.Playwright.IBrowser? _browser;
 
     private CloakBrowserHandle? _handle;
@@ -25,14 +34,14 @@ public sealed partial class CloakBrowserSession : IBrowserInteraction
                                    {
                                        WaitUntil =
                                            Microsoft.Playwright.WaitUntilState.DOMContentLoaded,
-                                       Timeout = 10000
+                                       Timeout = ReachabilityTimeoutMs
                                    });
 
             var status = response?.Status ?? 0;
             if (status < 200 || status >= 300) return false;
 
             var finalUrl = page.Url;
-            return !IsErrorPageUrl(finalUrl);
+            return !HtmlUtils.IsErrorPageUrl(finalUrl);
         }
         catch
         {
@@ -45,10 +54,13 @@ public sealed partial class CloakBrowserSession : IBrowserInteraction
         var page = await GetPageAsync(ct);
         await page.ClickAsync(
             selector,
-            new Microsoft.Playwright.PageClickOptions { Timeout = 5000 });
+            new Microsoft.Playwright.PageClickOptions { Timeout = ClickTimeoutMs });
         await page.WaitForLoadStateAsync(
             Microsoft.Playwright.LoadState.NetworkIdle,
-            new Microsoft.Playwright.PageWaitForLoadStateOptions { Timeout = 10000 });
+            new Microsoft.Playwright.PageWaitForLoadStateOptions
+                {
+                    Timeout = NetworkIdleTimeoutMs
+                });
     }
 
     public async ValueTask DisposeAsync()
@@ -74,6 +86,7 @@ public sealed partial class CloakBrowserSession : IBrowserInteraction
         _page = null;
         _browser = null;
         _handle = null;
+        _initLock.Dispose();
     }
 
     public async Task FillAsync(string selector, string value, CancellationToken ct = default)
@@ -86,7 +99,7 @@ public sealed partial class CloakBrowserSession : IBrowserInteraction
     {
         var page = await GetPageAsync(ct);
         var body = await page.TextContentAsync("body") ?? "";
-        return WhitespaceRegex().Replace(TagRegex().Replace(body, " "), " ").Trim();
+        return HtmlUtils.StripHtml(body);
     }
 
     public async Task<string> GetCurrentUrlAsync(CancellationToken ct = default)
@@ -108,29 +121,34 @@ public sealed partial class CloakBrowserSession : IBrowserInteraction
             url,
             new Microsoft.Playwright.PageGotoOptions
                 {
-                    WaitUntil = Microsoft.Playwright.WaitUntilState.NetworkIdle, Timeout = 15000
+                    WaitUntil = Microsoft.Playwright.WaitUntilState.NetworkIdle,
+                    Timeout = NavigateTimeoutMs
                 });
     }
 
     private async Task<Microsoft.Playwright.IPage> GetPageAsync(CancellationToken ct)
     {
         if (_page is not null)
+        {
             return _page;
+        }
 
-        _handle ??= await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = true, });
+        await _initLock.WaitAsync(ct);
+        try
+        {
+            if (_page is not null)
+            {
+                return _page;
+            }
 
-        _browser = _handle.RawBrowser;
-        return _page ??= await _browser.NewPageAsync();
+            _handle ??= await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = true, });
+
+            _browser = _handle.RawBrowser;
+            return _page ??= await _browser.NewPageAsync();
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
-
-    private static bool IsErrorPageUrl(string url) =>
-        url.Contains("/notfound", StringComparison.OrdinalIgnoreCase) ||
-        url.Contains("/error", StringComparison.OrdinalIgnoreCase) ||
-        url.Contains("/404", StringComparison.OrdinalIgnoreCase);
-
-    [GeneratedRegex(@"<[^>]+>")]
-    private static partial Regex TagRegex();
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex WhitespaceRegex();
 }

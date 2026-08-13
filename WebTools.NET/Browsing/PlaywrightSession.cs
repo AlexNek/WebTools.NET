@@ -1,13 +1,22 @@
-using System.Text.RegularExpressions;
-
 using Microsoft.Playwright;
 
 using WebTools.NET.Abstractions;
+using WebTools.NET.Internal;
 
 namespace WebTools.NET.Browsing;
 
-public sealed partial class PlaywrightSession : IBrowserInteraction
+public sealed class PlaywrightSession : IBrowserInteraction
 {
+    private const int ClickTimeoutMs = 5000;
+
+    private const int NavigateTimeoutMs = 15000;
+
+    private const int NetworkIdleTimeoutMs = 10000;
+
+    private const int ReachabilityTimeoutMs = 10000;
+
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+
     private IBrowser? _browser;
 
     private IPage? _page;
@@ -23,14 +32,15 @@ public sealed partial class PlaywrightSession : IBrowserInteraction
                                url,
                                new PageGotoOptions
                                    {
-                                       WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 10000
+                                       WaitUntil = WaitUntilState.DOMContentLoaded,
+                                       Timeout = ReachabilityTimeoutMs
                                    });
 
             var status = response?.Status ?? 0;
             if (status < 200 || status >= 300) return false;
 
             var finalUrl = page.Url;
-            return !IsErrorPageUrl(finalUrl);
+            return !HtmlUtils.IsErrorPageUrl(finalUrl);
         }
         catch
         {
@@ -41,10 +51,10 @@ public sealed partial class PlaywrightSession : IBrowserInteraction
     public async Task ClickAsync(string selector, CancellationToken ct = default)
     {
         var page = await GetPageAsync(ct);
-        await page.ClickAsync(selector, new PageClickOptions { Timeout = 5000 });
+        await page.ClickAsync(selector, new PageClickOptions { Timeout = ClickTimeoutMs });
         await page.WaitForLoadStateAsync(
             LoadState.NetworkIdle,
-            new PageWaitForLoadStateOptions { Timeout = 10000 });
+            new PageWaitForLoadStateOptions { Timeout = NetworkIdleTimeoutMs });
     }
 
     public async ValueTask DisposeAsync()
@@ -54,6 +64,7 @@ public sealed partial class PlaywrightSession : IBrowserInteraction
         if (_browser is not null)
             await _browser.CloseAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
         _playwright?.Dispose();
+        _initLock.Dispose();
     }
 
     public async Task FillAsync(string selector, string value, CancellationToken ct = default)
@@ -66,7 +77,7 @@ public sealed partial class PlaywrightSession : IBrowserInteraction
     {
         var page = await GetPageAsync(ct);
         var body = await page.TextContentAsync("body") ?? "";
-        return WhitespaceRegex().Replace(TagRegex().Replace(body, " "), " ").Trim();
+        return HtmlUtils.StripHtml(body);
     }
 
     public async Task<string> GetCurrentUrlAsync(CancellationToken ct = default)
@@ -86,26 +97,36 @@ public sealed partial class PlaywrightSession : IBrowserInteraction
         var page = await GetPageAsync(ct);
         await page.GotoAsync(
             url,
-            new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle, Timeout = 15000 });
+            new PageGotoOptions
+                {
+                    WaitUntil = WaitUntilState.NetworkIdle, Timeout = NavigateTimeoutMs
+                });
     }
 
     private async Task<IPage> GetPageAsync(CancellationToken ct)
     {
-        _playwright ??= await Playwright.CreateAsync();
-        _browser ??=
-            await _playwright.Chromium.LaunchAsync(
-                new BrowserTypeLaunchOptions { Headless = true });
-        return _page ??= await _browser.NewPageAsync();
+        if (_page is not null)
+        {
+            return _page;
+        }
+
+        await _initLock.WaitAsync(ct);
+        try
+        {
+            if (_page is not null)
+            {
+                return _page;
+            }
+
+            _playwright ??= await Playwright.CreateAsync();
+            _browser ??=
+                await _playwright.Chromium.LaunchAsync(
+                    new BrowserTypeLaunchOptions { Headless = true });
+            return _page ??= await _browser.NewPageAsync();
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
-
-    private static bool IsErrorPageUrl(string url) =>
-        url.Contains("/notfound", StringComparison.OrdinalIgnoreCase) ||
-        url.Contains("/error", StringComparison.OrdinalIgnoreCase) ||
-        url.Contains("/404", StringComparison.OrdinalIgnoreCase);
-
-    [GeneratedRegex(@"<[^>]+>")]
-    private static partial Regex TagRegex();
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex WhitespaceRegex();
 }

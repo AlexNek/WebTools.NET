@@ -97,4 +97,21 @@ public class DuckDuckGoSearchProviderTests
         result.Success.Should().BeTrue();
         result.Results.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task SearchAsync_WhenCancelled_ThrowsOperationCanceledException()
+    {
+        // Arrange
+        var fakeHandler = new FakeHttpMessageHandler(HttpStatusCode.OK, "<html></html>");
+        var httpClient = new HttpClient(fakeHandler);
+        using var sut = new DuckDuckGoSearchProvider(httpClient);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act
+        var act = () => sut.SearchAsync("test", ct: cts.Token);
+
+        // Assert — cancellation must propagate, not be swallowed into a result
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }

@@ -6,23 +6,32 @@ using WebTools.NET.Search;
 
 namespace WebTools.NET;
 
-public sealed class WebSearchAgent
+public sealed class WebSearchAgent : IAsyncDisposable
 {
-    private static readonly PlaywrightSearchProvider DefaultSearch = new();
-
     private readonly ILogger<WebSearchAgent>? _logger;
+
+    private readonly PlaywrightSearchProvider? _ownedSearch;
 
     private readonly IWebSearchProvider _search;
 
     public WebSearchAgent()
-        : this(DefaultSearch)
     {
+        _ownedSearch = new PlaywrightSearchProvider();
+        _search = _ownedSearch;
     }
 
     public WebSearchAgent(IWebSearchProvider search, ILogger<WebSearchAgent>? logger = null)
     {
         _search = search ?? throw new ArgumentNullException(nameof(search));
         _logger = logger;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_ownedSearch is not null)
+        {
+            await _ownedSearch.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     public async Task<SearchResult> SearchAsync(
@@ -41,7 +50,7 @@ public sealed class WebSearchAgent
             "Initial search '{Query}' returned no results, trying fallback queries",
             query);
 
-        foreach (var fq in TryGenerateFallbackQueries(query))
+        foreach (var fq in GenerateFallbackQueries(query))
         {
             result = await _search.SearchAsync(fq, maxResults, ct);
             if (result.Success && result.Results.Count > 0)
@@ -53,10 +62,10 @@ public sealed class WebSearchAgent
         return result;
     }
 
-    private static string[] TryGenerateFallbackQueries(string query)
+    private static string[] GenerateFallbackQueries(string query)
     {
         return query.Contains(" API", StringComparison.OrdinalIgnoreCase)
-                   ? [query.Replace(" API", ""), query + " official site", query]
-                   : [query + " official site", query];
+                   ? [query.Replace(" API", ""), query + " official site"]
+                   : [query + " official site"];
     }
 }

@@ -91,4 +91,24 @@ public class WebSearchAgentTests
         // Assert
         await searchProvider.Received(1).SearchAsync("query", 7, Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task SearchAsync_WhenAllSearchesReturnEmpty_DoesNotRepeatOriginalQuery()
+    {
+        // Arrange
+        var searchProvider = Substitute.For<IWebSearchProvider>();
+        var emptyResult = new SearchResult(true, [], null);
+        searchProvider.SearchAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(emptyResult);
+
+        var sut = new WebSearchAgent(searchProvider);
+
+        // Act
+        await sut.SearchAsync("Playwright .NET API");
+
+        // Assert — original + 2 fallbacks, original never repeated
+        await searchProvider.ReceivedWithAnyArgs(3).SearchAsync(default!, default, default);
+        await searchProvider.Received(1)
+            .SearchAsync("Playwright .NET API", Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
 }

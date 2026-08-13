@@ -37,6 +37,8 @@ public sealed partial class DuckDuckGoSearchProvider : IWebSearchProvider, IDisp
         int maxResults = 5,
         CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         try
         {
             var url = $"https://html.duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
@@ -48,6 +50,10 @@ public sealed partial class DuckDuckGoSearchProvider : IWebSearchProvider, IDisp
             var html = await resp.Content.ReadAsStringAsync(ct);
             var results = ParseResults(html, maxResults);
             return new SearchResult(true, results, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
