@@ -8,7 +8,7 @@
     <PackageId>WebTools.NET</PackageId>
     <Title>WebTools.NET</Title>
     <Description>Web tools for .NET agents: web search, browser-based content fetching, and navigation.</Description>
-    <Authors>CanteenManager</Authors>
+    <Authors>AlexNek</Authors>
     <PackageTags>web;search;browser;playwright;agent;tools;dotnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -17,8 +17,8 @@
     <!-- Repository metadata -->
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <RepositoryUrl>https://github.com/CanteenManager/WebTools.NET</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/CanteenManager/WebTools.NET</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/AlexNek/WebTools.NET</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/AlexNek/WebTools.NET</PackageProjectUrl>
 
     <!-- Symbols / CI -->
     <IncludeSymbols>true</IncludeSymbols>

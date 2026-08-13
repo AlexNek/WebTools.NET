@@ -4,10 +4,10 @@
     <id>WebTools.NET</id>
     <version>$version$</version>
     <title>WebTools.NET</title>
-    <authors>CanteenManager</authors>
+    <authors>AlexNek</authors>
     <license type="expression">MIT</license>
-    <projectUrl>https://github.com/CanteenManager/WebTools.NET</projectUrl>
-    <repository type="git" url="https://github.com/CanteenManager/WebTools.NET" />
+    <projectUrl>https://github.com/AlexNek/WebTools.NET</projectUrl>
+    <repository type="git" url="https://github.com/AlexNek/WebTools.NET" />
     <icon>icon.png</icon>
     <readme>README.md</readme>
     <description>Web tools for .NET agents: web search, browser-based content fetching, and navigation.</description>

@@ -47,5 +47,5 @@ Every operation returns a result object (`SearchResult`, `WebContent`,
 
 ## License
 
-MIT — see the [LICENSE.txt](https://github.com/CanteenManager/WebTools.NET/blob/main/LICENSE.txt)
+MIT — see the [LICENSE.txt](https://github.com/AlexNek/WebTools.NET/blob/main/LICENSE.txt)
 in the repository.

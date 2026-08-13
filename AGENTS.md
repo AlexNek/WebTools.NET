@@ -68,7 +68,7 @@ WebTools.NET.Demo   →  WebTools.NET  ←  WebTools.NET.Tests
 - Each release is a level-2 heading: `## [X.Y.Z] - YYYY-MM-DD`
 - Work-in-progress lives under: `## [Unreleased]`
 - Change categories (level-3 headings): `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
-- Bottom of the file has reference links: `[X.Y.Z]: https://github.com/CanteenManager/WebTools.NET/releases/tag/vX.Y.Z`
+- Bottom of the file has reference links: `[X.Y.Z]: https://github.com/AlexNek/WebTools.NET/releases/tag/vX.Y.Z`
 
 ### Algorithm: when making code changes
 
@@ -87,7 +87,7 @@ The `[Unreleased]` section must always describe the **final user-facing state re
 2. Add a new empty `## [Unreleased]` section above it
 3. Update the reference links at the bottom:
    - Change `[Unreleased]` link to compare `vX.Y.Z...HEAD`
-   - Add `[X.Y.Z]: https://github.com/CanteenManager/WebTools.NET/releases/tag/vX.Y.Z`
+   - Add `[X.Y.Z]: https://github.com/AlexNek/WebTools.NET/releases/tag/vX.Y.Z`
 4. The release workflow (`.github/workflows/release.yml`) will automatically:
    - Build, test, and pack the NuGet package
    - Publish to NuGet.org

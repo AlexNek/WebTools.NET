@@ -1,8 +1,8 @@
 site_name: WebTools.NET Developer Manual
 site_description: Developer manual for WebTools.NET — web search, browser content fetching, and navigation for .NET agents
-site_url: https://canteenmanager.github.io/WebTools.NET/
-repo_url: https://github.com/CanteenManager/WebTools.NET
-repo_name: CanteenManager/WebTools.NET
+site_url: https://alexnek.github.io/WebTools.NET/
+repo_url: https://github.com/AlexNek/WebTools.NET
+repo_name: AlexNek/WebTools.NET
 
 theme:
   name: material
@@ -91,4 +91,4 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/CanteenManager/WebTools.NET
+      link: https://github.com/AlexNek/WebTools.NET

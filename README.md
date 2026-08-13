@@ -195,12 +195,12 @@ navigation — with a per-section summary table at the end.
 ## Documentation
 
 The developer manual is published at
-[canteenmanager.github.io/WebTools.NET](https://canteenmanager.github.io/WebTools.NET/).
+[alexnek.github.io/WebTools.NET](https://alexnek.github.io/WebTools.NET/).
 
 ## Changelog
 
-See [CHANGELOG.md](https://github.com/CanteenManager/WebTools.NET/blob/main/CHANGELOG.md) for release history.
+See [CHANGELOG.md](https://github.com/AlexNek/WebTools.NET/blob/main/CHANGELOG.md) for release history.
 
 ## License
 
-MIT – see [LICENSE.txt](https://github.com/CanteenManager/WebTools.NET/blob/main/LICENSE.txt) for details.
+MIT – see [LICENSE.txt](https://github.com/AlexNek/WebTools.NET/blob/main/LICENSE.txt) for details.
