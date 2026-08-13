@@ -199,8 +199,8 @@ The developer manual is published at
 
 ## Changelog
 
-See [CHANGELOG.md](https://github.com/AlexNek/WebTools.NET/blob/main/CHANGELOG.md) for release history.
+See [CHANGELOG.md](https://github.com/AlexNek/WebTools.NET/blob/master/CHANGELOG.md) for release history.
 
 ## License
 
-MIT – see [LICENSE.txt](https://github.com/AlexNek/WebTools.NET/blob/main/LICENSE.txt) for details.
+MIT – see [LICENSE.txt](https://github.com/AlexNek/WebTools.NET/blob/master/LICENSE.txt) for details.
