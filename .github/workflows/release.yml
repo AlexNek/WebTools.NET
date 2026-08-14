@@ -127,15 +127,44 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for the commit changelog
+
       - name: Download NuGet artifact
         uses: actions/download-artifact@v4
         with:
           name: nuget-packages
           path: ./nupkg
 
+      # generate_release_notes only lists merged PRs (this repo has none),
+      # so build the notes from the commits since the previous tag instead.
+      - name: Build release notes
+        run: |
+          TAG="v${{ needs.build-and-test.outputs.version }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            PREV=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          else
+            PREV=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          fi
+          {
+            if [ -n "$PREV" ]; then
+              echo "## What's changed since $PREV"
+              echo ""
+              git log --pretty=format:"- %h %s" "$PREV"..HEAD
+              echo ""
+              echo ""
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV...$TAG"
+            else
+              echo "Initial release."
+            fi
+          } > notes.md
+          cat notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.build-and-test.outputs.version }}
-          generate_release_notes: true
+          body_path: notes.md
           files: ./nupkg/*.nupkg
