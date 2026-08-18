@@ -138,10 +138,10 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
 
     public Task<WebContent> FetchAsync(string url, int? maxContentLength = null, CancellationToken ct = default)
     {
-        return FetchAsAsync(url, EContentFormat.PlainText, maxContentLength, ct);
+        return FetchAsAsync(url, EContentFormat.PlainText, maxContentLength, ESanitizeLevel.Strict, ct);
     }
 
-    public async Task<WebContent> FetchAsAsync(string url, EContentFormat format, int? maxContentLength = null, CancellationToken ct = default)
+    public async Task<WebContent> FetchAsAsync(string url, EContentFormat format, int? maxContentLength = null, ESanitizeLevel sanitizeLevel = ESanitizeLevel.Strict, CancellationToken ct = default)
     {
         if (maxContentLength is <= 0)
         {
@@ -207,7 +207,7 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
                 return new WebContent(false, errorText, $"HTTP {status}", finalUrl);
             }
 
-            var content = ContentProcessor.Process(rawBody, format, maxContentLength);
+            var content = ContentProcessor.Process(rawBody, format, maxContentLength, sanitizeLevel);
             return new WebContent(true, content, null, finalUrl);
         }
         catch (TimeoutException)

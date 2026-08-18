@@ -160,10 +160,10 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
 
     public Task<WebContent> FetchAsync(string url, int? maxContentLength = null, CancellationToken ct = default)
     {
-        return FetchAsAsync(url, EContentFormat.PlainText, maxContentLength, ct);
+        return FetchAsAsync(url, EContentFormat.PlainText, maxContentLength, ESanitizeLevel.Strict, ct);
     }
 
-    public async Task<WebContent> FetchAsAsync(string url, EContentFormat format, int? maxContentLength = null, CancellationToken ct = default)
+    public async Task<WebContent> FetchAsAsync(string url, EContentFormat format, int? maxContentLength = null, ESanitizeLevel sanitizeLevel = ESanitizeLevel.Strict, CancellationToken ct = default)
     {
         if (maxContentLength is <= 0)
         {
@@ -205,7 +205,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
                     return new WebContent(false, "", "Blocked by bot protection", finalUrl);
                 }
 
-                return await NonHeadlessFetchFallbackAsync(url, format, maxContentLength, ct);
+                return await NonHeadlessFetchFallbackAsync(url, format, maxContentLength, sanitizeLevel, ct);
             }
 
             // Give JS a moment to render, but don't wait for full NetworkIdle
@@ -237,7 +237,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
                 return new WebContent(false, errorText, $"HTTP {status}", finalUrl);
             }
 
-            var content = ContentProcessor.Process(rawBody, format, maxContentLength);
+            var content = ContentProcessor.Process(rawBody, format, maxContentLength, sanitizeLevel);
             return new WebContent(true, content, null, finalUrl);
         }
         catch (TimeoutException)
@@ -352,7 +352,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
         }
     }
 
-    private Task<WebContent> NonHeadlessFetchFallbackAsync(string url, EContentFormat format, int? maxContentLength, CancellationToken ct)
+    private Task<WebContent> NonHeadlessFetchFallbackAsync(string url, EContentFormat format, int? maxContentLength, ESanitizeLevel sanitizeLevel, CancellationToken ct)
     {
         return WithNonHeadlessBrowserAsync(
             url,
@@ -385,7 +385,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
                     return new WebContent(false, errorText, $"HTTP {status}", finalUrl);
                 }
 
-                var content = ContentProcessor.Process(rawBody, format, maxContentLength);
+                var content = ContentProcessor.Process(rawBody, format, maxContentLength, sanitizeLevel);
                 return new WebContent(true, content, null, finalUrl);
             });
     }

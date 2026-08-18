@@ -75,6 +75,31 @@ var md = await fetcher.FetchAsAsync(
     maxContentLength: 4000);
 ```
 
+## Sanitization Level
+
+By default, `FetchAsAsync` strips navigation noise (script, style, nav, footer,
+header) before conversion. Use `ESanitizeLevel` to control this:
+
+```csharp
+// Default: strip all noise — best for reading article content
+var article = await fetcher.FetchAsAsync(url, EContentFormat.Markdown);
+
+// Minimal: keep nav/header/footer — best for page discovery and link finding
+var page = await fetcher.FetchAsAsync(
+    url,
+    EContentFormat.Markdown,
+    sanitizeLevel: ESanitizeLevel.Minimal);
+
+// None: no sanitization — raw body HTML or full Markdown conversion
+var raw = await fetcher.FetchAsAsync(url, EContentFormat.Html, sanitizeLevel: ESanitizeLevel.None);
+```
+
+| Level | Removes | Best for |
+| --- | --- | --- |
+| `Strict` (default) | script, style, nav, footer, header | Reading main content |
+| `Minimal` | script, style only | Page discovery, finding navigation links |
+| `None` | Nothing | Full page structure needed |
+
 ## Engine Implementations
 
 | Engine | Implementation |

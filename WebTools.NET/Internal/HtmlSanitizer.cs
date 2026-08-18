@@ -1,21 +1,47 @@
-using System.Text.RegularExpressions;
+using AngleSharp.Html.Parser;
+
+using WebTools.NET.Models;
 
 namespace WebTools.NET.Internal;
 
-internal static partial class HtmlSanitizer
+internal static class HtmlSanitizer
 {
-    internal static string RemoveNoiseTags(string html)
+    private static readonly HashSet<string> StrictNoiseTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "script", "style", "nav", "footer", "header"
+    };
+
+    private static readonly HashSet<string> MinimalNoiseTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "script", "style"
+    };
+
+    internal static string RemoveNoiseTags(string html, ESanitizeLevel level = ESanitizeLevel.Strict)
     {
         if (string.IsNullOrWhiteSpace(html))
         {
             return "";
         }
 
-        return NoiseTagRegex().Replace(html, "");
-    }
+        if (level == ESanitizeLevel.None)
+        {
+            return html;
+        }
 
-    [GeneratedRegex(
-        @"<(script|style|nav|footer|header)\b[^>]*>[\s\S]*?</\1>",
-        RegexOptions.IgnoreCase | RegexOptions.Singleline)]
-    private static partial Regex NoiseTagRegex();
+        var tags = level == ESanitizeLevel.Minimal ? MinimalNoiseTags : StrictNoiseTags;
+
+        var parser = new HtmlParser();
+        var document = parser.ParseDocument(html);
+
+        var elements = document.Body?.QuerySelectorAll(string.Join(",", tags));
+        if (elements is not null)
+        {
+            foreach (var element in elements.ToList())
+            {
+                element.Remove();
+            }
+        }
+
+        return document.Body?.InnerHtml ?? "";
+    }
 }

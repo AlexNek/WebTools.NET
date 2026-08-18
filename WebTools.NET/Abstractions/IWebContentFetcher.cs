@@ -31,10 +31,14 @@ public interface IWebContentFetcher : IAsyncDisposable
     /// Maximum number of characters to return. When <c>null</c>, the full
     /// content is returned without truncation.
     /// </param>
+    /// <param name="sanitizeLevel">
+    /// Controls which noise tags are removed. Strict (default) removes script, style,
+    /// nav, footer, header. Minimal removes only script and style. None skips sanitization.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The fetched web content in the requested format.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when <paramref name="maxContentLength"/> is less than or equal to zero.
     /// </exception>
-    Task<WebContent> FetchAsAsync(string url, EContentFormat format, int? maxContentLength = null, CancellationToken ct = default);
+    Task<WebContent> FetchAsAsync(string url, EContentFormat format, int? maxContentLength = null, ESanitizeLevel sanitizeLevel = ESanitizeLevel.Strict, CancellationToken ct = default);
 }

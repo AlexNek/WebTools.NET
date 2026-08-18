@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `FetchAsAsync` method on `IWebContentFetcher` with `EContentFormat` parameter for Markdown and Html output modes
 - `EContentFormat` enum: `PlainText`, `Markdown`, `Html`
+- `ESanitizeLevel` enum: `Strict`, `Minimal`, `None` — caller controls which noise tags are stripped
 
 ### Changed
 
