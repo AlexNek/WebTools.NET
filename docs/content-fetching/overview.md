@@ -45,6 +45,36 @@ consumers that content was trimmed, append your own suffix after the call.
 Passing `null` (the default) returns everything. Passing a value ≤ 0 throws
 `ArgumentOutOfRangeException`.
 
+## Content Format
+
+Use `FetchAsAsync` to control the output format:
+
+```csharp
+// Get page content as Markdown (preserves tables, headings, links, images)
+var md = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.Markdown);
+
+// Get raw HTML with noise removed (scripts, styles, nav, footer stripped)
+var html = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.Html);
+
+// Plain text (same as FetchAsync)
+var text = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.PlainText);
+```
+
+| Format | Output | Best for |
+| --- | --- | --- |
+| `PlainText` | Stripped text, whitespace collapsed | Token-efficient LLM input |
+| `Markdown` | GitHub-flavored Markdown with tables, headings, links, images | LLMs that benefit from structure |
+| `Html` | Body HTML with noise tags removed | Downstream HTML processing |
+
+`maxContentLength` works with all formats — it applies after conversion:
+
+```csharp
+var md = await fetcher.FetchAsAsync(
+    "https://test.example.com",
+    EContentFormat.Markdown,
+    maxContentLength: 4000);
+```
+
 ## Engine Implementations
 
 | Engine | Implementation |

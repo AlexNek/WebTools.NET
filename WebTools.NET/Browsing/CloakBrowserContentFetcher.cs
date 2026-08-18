@@ -59,7 +59,7 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
             var status = response?.Status ?? 0;
             var finalUrl = page.Url;
 
-            if (status == 403)
+            if (status == HttpStatusHelper.Forbidden)
             {
                 await page.CloseAsync().ConfigureAwait(false);
                 page = await context.NewPageAsync();
@@ -69,7 +69,7 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
                 finalUrl = page.Url;
             }
 
-            if (status >= 200 && status < 300 && HtmlUtils.IsErrorPageUrl(finalUrl))
+            if (HttpStatusHelper.IsSuccess(status) && HtmlUtils.IsErrorPageUrl(finalUrl))
             {
                 return new UrlCheckResult(
                     false,
@@ -78,7 +78,7 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
                     FinalUrl: finalUrl);
             }
 
-            if (status >= 200 && status < 400)
+            if (HttpStatusHelper.IsSuccessOrRedirect(status))
             {
                 return new UrlCheckResult(true, status, null, FinalUrl: finalUrl);
             }
@@ -136,7 +136,12 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
         _launchLock.Dispose();
     }
 
-    public async Task<WebContent> FetchAsync(string url, int? maxContentLength = null, CancellationToken ct = default)
+    public Task<WebContent> FetchAsync(string url, int? maxContentLength = null, CancellationToken ct = default)
+    {
+        return FetchAsAsync(url, EContentFormat.PlainText, maxContentLength, ct);
+    }
+
+    public async Task<WebContent> FetchAsAsync(string url, EContentFormat format, int? maxContentLength = null, CancellationToken ct = default)
     {
         if (maxContentLength is <= 0)
         {
@@ -161,7 +166,7 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
             var status = response?.Status ?? 0;
             var finalUrl = page.Url;
 
-            if (status == 403)
+            if (status == HttpStatusHelper.Forbidden)
             {
                 await page.CloseAsync().ConfigureAwait(false);
                 page = await context.NewPageAsync();
@@ -186,32 +191,24 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
 
             finalUrl = page.Url;
             status = response?.Status ?? 0;
-            var body = await page.TextContentAsync("body") ?? "";
-            var stripped = HtmlUtils.StripHtml(body);
+            var rawBody = format == EContentFormat.PlainText
+                ? await page.TextContentAsync("body") ?? ""
+                : await page.InnerHTMLAsync("body");
 
-            if (HtmlUtils.IsErrorPageUrl(finalUrl) && status >= 200 && status < 300)
+            if (HtmlUtils.IsErrorPageUrl(finalUrl) && HttpStatusHelper.IsSuccess(status))
             {
-                return new WebContent(
-                    false,
-                    HtmlUtils.Truncate(stripped, ErrorContentLimit),
-                    $"Redirected to error page ({finalUrl})",
-                    finalUrl);
+                var errorText = HtmlUtils.Truncate(HtmlUtils.StripHtml(rawBody), ErrorContentLimit);
+                return new WebContent(false, errorText, $"Redirected to error page ({finalUrl})", finalUrl);
             }
 
-            if (status < 200 || status >= 300)
+            if (HttpStatusHelper.IsNotSuccess(status))
             {
-                return new WebContent(
-                    false,
-                    HtmlUtils.Truncate(stripped, ErrorContentLimit),
-                    $"HTTP {status}",
-                    finalUrl);
+                var errorText = HtmlUtils.Truncate(HtmlUtils.StripHtml(rawBody), ErrorContentLimit);
+                return new WebContent(false, errorText, $"HTTP {status}", finalUrl);
             }
 
-            return new WebContent(
-                true,
-                HtmlUtils.TruncateIfNeeded(stripped, maxContentLength),
-                null,
-                finalUrl);
+            var content = ContentProcessor.Process(rawBody, format, maxContentLength);
+            return new WebContent(true, content, null, finalUrl);
         }
         catch (TimeoutException)
         {

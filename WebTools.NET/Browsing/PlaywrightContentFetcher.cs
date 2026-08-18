@@ -79,7 +79,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
             var status = response?.Status ?? 0;
             var finalUrl = page.Url;
 
-            if (status == 403)
+            if (status == HttpStatusHelper.Forbidden)
             {
                 await page.CloseAsync().ConfigureAwait(false);
                 page = await CreateStealthPageAsync(context);
@@ -90,7 +90,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
             }
 
             // After retry still blocked — try non-headless fallback for Cloudflare
-            if (status is 403 or 429 && await IsBotChallengePageAsync(page))
+            if (status is HttpStatusHelper.Forbidden or HttpStatusHelper.TooManyRequests && await IsBotChallengePageAsync(page))
             {
                 if (!_allowVisibleFallback)
                 {
@@ -105,7 +105,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
                 return await NonHeadlessReachabilityFallbackAsync(url, ct);
             }
 
-            if (status >= 200 && status < 300 && HtmlUtils.IsErrorPageUrl(finalUrl))
+            if (HttpStatusHelper.IsSuccess(status) && HtmlUtils.IsErrorPageUrl(finalUrl))
             {
                 return new UrlCheckResult(
                     false,
@@ -114,7 +114,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
                     FinalUrl: finalUrl);
             }
 
-            if (status >= 200 && status < 400)
+            if (HttpStatusHelper.IsSuccessOrRedirect(status))
             {
                 return new UrlCheckResult(true, status, null, FinalUrl: finalUrl);
             }
@@ -158,7 +158,12 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
         _fallbackLock.Dispose();
     }
 
-    public async Task<WebContent> FetchAsync(string url, int? maxContentLength = null, CancellationToken ct = default)
+    public Task<WebContent> FetchAsync(string url, int? maxContentLength = null, CancellationToken ct = default)
+    {
+        return FetchAsAsync(url, EContentFormat.PlainText, maxContentLength, ct);
+    }
+
+    public async Task<WebContent> FetchAsAsync(string url, EContentFormat format, int? maxContentLength = null, CancellationToken ct = default)
     {
         if (maxContentLength is <= 0)
         {
@@ -182,7 +187,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
             var status = response?.Status ?? 0;
             var finalUrl = page.Url;
 
-            if (status == 403)
+            if (status == HttpStatusHelper.Forbidden)
             {
                 await page.CloseAsync().ConfigureAwait(false);
                 page = await CreateStealthPageAsync(context);
@@ -193,14 +198,14 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
             }
 
             // If still Cloudflare-blocked after retry, try non-headless fallback
-            if (status == 403 && await IsBotChallengePageAsync(page))
+            if (status == HttpStatusHelper.Forbidden && await IsBotChallengePageAsync(page))
             {
                 if (!_allowVisibleFallback)
                 {
                     return new WebContent(false, "", "Blocked by bot protection", finalUrl);
                 }
 
-                return await NonHeadlessFetchFallbackAsync(url, maxContentLength, ct);
+                return await NonHeadlessFetchFallbackAsync(url, format, maxContentLength, ct);
             }
 
             // Give JS a moment to render, but don't wait for full NetworkIdle
@@ -218,32 +223,22 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
 
             finalUrl = page.Url;
             status = response?.Status ?? 0;
-            var body = await page.TextContentAsync("body") ?? "";
-            var stripped = HtmlUtils.StripHtml(body);
+            var rawBody = await GetRawBodyAsync(page, format);
 
-            if (HtmlUtils.IsErrorPageUrl(finalUrl) && status >= 200 && status < 300)
+            if (HtmlUtils.IsErrorPageUrl(finalUrl) && HttpStatusHelper.IsSuccess(status))
             {
-                return new WebContent(
-                    false,
-                    HtmlUtils.Truncate(stripped, ErrorContentLimit),
-                    $"Redirected to error page ({finalUrl})",
-                    finalUrl);
+                var errorText = HtmlUtils.Truncate(HtmlUtils.StripHtml(rawBody), ErrorContentLimit);
+                return new WebContent(false, errorText, $"Redirected to error page ({finalUrl})", finalUrl);
             }
 
-            if (status < 200 || status >= 300)
+            if (HttpStatusHelper.IsNotSuccess(status))
             {
-                return new WebContent(
-                    false,
-                    HtmlUtils.Truncate(stripped, ErrorContentLimit),
-                    $"HTTP {status}",
-                    finalUrl);
+                var errorText = HtmlUtils.Truncate(HtmlUtils.StripHtml(rawBody), ErrorContentLimit);
+                return new WebContent(false, errorText, $"HTTP {status}", finalUrl);
             }
 
-            return new WebContent(
-                true,
-                HtmlUtils.TruncateIfNeeded(stripped, maxContentLength),
-                null,
-                finalUrl);
+            var content = ContentProcessor.Process(rawBody, format, maxContentLength);
+            return new WebContent(true, content, null, finalUrl);
         }
         catch (TimeoutException)
         {
@@ -357,7 +352,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
         }
     }
 
-    private Task<WebContent> NonHeadlessFetchFallbackAsync(string url, int? maxContentLength, CancellationToken ct)
+    private Task<WebContent> NonHeadlessFetchFallbackAsync(string url, EContentFormat format, int? maxContentLength, CancellationToken ct)
     {
         return WithNonHeadlessBrowserAsync(
             url,
@@ -382,24 +377,27 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
                 }
 
                 finalUrl = page.Url;
-                var body = await page.TextContentAsync("body") ?? "";
-                var stripped = HtmlUtils.StripHtml(body);
+                var rawBody = await GetRawBodyAsync(page, format);
 
-                if (status < 200 || status >= 300)
+                if (HttpStatusHelper.IsNotSuccess(status))
                 {
-                    return new WebContent(
-                        false,
-                        HtmlUtils.Truncate(stripped, ErrorContentLimit),
-                        $"HTTP {status}",
-                        finalUrl);
+                    var errorText = HtmlUtils.Truncate(HtmlUtils.StripHtml(rawBody), ErrorContentLimit);
+                    return new WebContent(false, errorText, $"HTTP {status}", finalUrl);
                 }
 
-                return new WebContent(
-                    true,
-                    HtmlUtils.TruncateIfNeeded(stripped, maxContentLength),
-                    null,
-                    finalUrl);
+                var content = ContentProcessor.Process(rawBody, format, maxContentLength);
+                return new WebContent(true, content, null, finalUrl);
             });
+    }
+
+    private static async Task<string> GetRawBodyAsync(IPage page, EContentFormat format)
+    {
+        if (format == EContentFormat.PlainText)
+        {
+            return await page.TextContentAsync("body") ?? "";
+        }
+
+        return await page.InnerHTMLAsync("body");
     }
 
     private Task<UrlCheckResult> NonHeadlessReachabilityFallbackAsync(
@@ -411,7 +409,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
             ct,
             (page, status, finalUrl, challenged) =>
             {
-                if (!challenged && status >= 200 && status < 400)
+                if (!challenged && HttpStatusHelper.IsSuccessOrRedirect(status))
                 {
                     return Task.FromResult(new UrlCheckResult(true, status, null, FinalUrl: finalUrl));
                 }
@@ -497,7 +495,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
                 var finalUrl = page.Url;
 
                 // Wait for a possible bot challenge to resolve (up to ChallengeWaitMs)
-                var challenged = status == 403 || await IsBotChallengePageAsync(page);
+                var challenged = status == HttpStatusHelper.Forbidden || await IsBotChallengePageAsync(page);
                 if (challenged)
                 {
                     try
