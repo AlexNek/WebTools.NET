@@ -24,6 +24,9 @@ internal static partial class HtmlUtils
     internal static string Truncate(string text, int maxLen) =>
         text.Length <= maxLen ? text : text[..maxLen] + "\n... [truncated]";
 
+    internal static string TruncateIfNeeded(string text, int? maxLen) =>
+        maxLen.HasValue ? Truncate(text, maxLen.Value) : text;
+
     [GeneratedRegex(@"<[^>]+>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex TagRegex();
 

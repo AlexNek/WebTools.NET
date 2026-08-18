@@ -14,8 +14,6 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
     private const string CloakNotInstalledMessage =
         "CloakBrowser binary not found. First launch should auto-download, or run: dotnet cloakbrowser install";
 
-    private const int ContentLimit = 8000;
-
     private const int ErrorContentLimit = 3000;
 
     private const int FetchGotoTimeoutMs = 20_000;
@@ -138,8 +136,13 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
         _launchLock.Dispose();
     }
 
-    public async Task<WebContent> FetchAsync(string url, CancellationToken ct = default)
+    public async Task<WebContent> FetchAsync(string url, int? maxContentLength = null, CancellationToken ct = default)
     {
+        if (maxContentLength is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxContentLength), maxContentLength, "Value must be a positive integer or null.");
+        }
+
         Microsoft.Playwright.IPage? page = null;
         try
         {
@@ -184,12 +187,13 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
             finalUrl = page.Url;
             status = response?.Status ?? 0;
             var body = await page.TextContentAsync("body") ?? "";
+            var stripped = HtmlUtils.StripHtml(body);
 
             if (HtmlUtils.IsErrorPageUrl(finalUrl) && status >= 200 && status < 300)
             {
                 return new WebContent(
                     false,
-                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
+                    HtmlUtils.Truncate(stripped, ErrorContentLimit),
                     $"Redirected to error page ({finalUrl})",
                     finalUrl);
             }
@@ -198,14 +202,14 @@ public sealed class CloakBrowserContentFetcher : IWebContentFetcher
             {
                 return new WebContent(
                     false,
-                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
+                    HtmlUtils.Truncate(stripped, ErrorContentLimit),
                     $"HTTP {status}",
                     finalUrl);
             }
 
             return new WebContent(
                 true,
-                HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ContentLimit),
+                HtmlUtils.TruncateIfNeeded(stripped, maxContentLength),
                 null,
                 finalUrl);
         }
