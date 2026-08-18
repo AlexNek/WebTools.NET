@@ -45,6 +45,61 @@ consumers that content was trimmed, append your own suffix after the call.
 Passing `null` (the default) returns everything. Passing a value ≤ 0 throws
 `ArgumentOutOfRangeException`.
 
+## Content Format
+
+Use `FetchAsAsync` to control the output format:
+
+```csharp
+// Get page content as Markdown (preserves tables, headings, links, images)
+var md = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.Markdown);
+
+// Get raw HTML with noise removed (scripts, styles, nav, footer stripped)
+var html = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.Html);
+
+// Plain text (same as FetchAsync)
+var text = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.PlainText);
+```
+
+| Format | Output | Best for |
+| --- | --- | --- |
+| `PlainText` | Stripped text, whitespace collapsed | Token-efficient LLM input |
+| `Markdown` | GitHub-flavored Markdown with tables, headings, links, images | LLMs that benefit from structure |
+| `Html` | Body HTML with noise tags removed | Downstream HTML processing |
+
+`maxContentLength` works with all formats — it applies after conversion:
+
+```csharp
+var md = await fetcher.FetchAsAsync(
+    "https://test.example.com",
+    EContentFormat.Markdown,
+    maxContentLength: 4000);
+```
+
+## Sanitization Level
+
+By default, `FetchAsAsync` strips navigation noise (script, style, nav, footer,
+header) before conversion. Use `ESanitizeLevel` to control this:
+
+```csharp
+// Default: strip all noise — best for reading article content
+var article = await fetcher.FetchAsAsync(url, EContentFormat.Markdown);
+
+// Minimal: keep nav/header/footer — best for page discovery and link finding
+var page = await fetcher.FetchAsAsync(
+    url,
+    EContentFormat.Markdown,
+    sanitizeLevel: ESanitizeLevel.Minimal);
+
+// None: no sanitization — raw body HTML or full Markdown conversion
+var raw = await fetcher.FetchAsAsync(url, EContentFormat.Html, sanitizeLevel: ESanitizeLevel.None);
+```
+
+| Level | Removes | Best for |
+| --- | --- | --- |
+| `Strict` (default) | script, style, nav, footer, header | Reading main content |
+| `Minimal` | script, style only | Page discovery, finding navigation links |
+| `None` | Nothing | Full page structure needed |
+
 ## Engine Implementations
 
 | Engine | Implementation |

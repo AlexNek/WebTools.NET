@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-18
+
+### Added
+
+- `FetchAsAsync` method on `IWebContentFetcher` with `EContentFormat` parameter for Markdown and Html output modes
+- `EContentFormat` enum: `PlainText`, `Markdown`, `Html`
+- `ESanitizeLevel` enum: `Strict`, `Minimal`, `None` — caller controls which noise tags are stripped
+
+### Changed
+
+- `FetchAsync` internally delegates to `FetchAsAsync` with `PlainText` format (no behavioral change)
+- `HtmlUtils.Truncate` no longer appends a suffix — returns exactly `maxLen` characters of content
+
 ## [1.1.0] - 2026-08-18
 
 ### Changed

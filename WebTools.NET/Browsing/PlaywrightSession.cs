@@ -37,7 +37,7 @@ public sealed class PlaywrightSession : IBrowserInteraction
                                    });
 
             var status = response?.Status ?? 0;
-            if (status < 200 || status >= 300) return false;
+            if (HttpStatusHelper.IsNotSuccess(status)) return false;
 
             var finalUrl = page.Url;
             return !HtmlUtils.IsErrorPageUrl(finalUrl);
