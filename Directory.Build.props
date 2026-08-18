@@ -9,8 +9,4 @@
     <LangVersion>latest</LangVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="GitVersion.MsBuild" Version="6.4.0" PrivateAssets="All" />
-  </ItemGroup>
 </Project>

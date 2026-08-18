@@ -24,6 +24,9 @@ on:
         description: 'Base version to publish, e.g. 1.0.0 (tag pushes use the tag instead)'
         required: true
 
+permissions:
+  contents: read
+
 env:
   DOTNET_VERSION: '10.0.x'
   PROJECT_PATH: WebTools.NET/WebTools.NET.csproj
@@ -36,30 +39,29 @@ jobs:
       version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0  # Full history needed for GitVersion
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Install GitVersion
-        uses: gittools/actions/gitversion/setup@v3
+        uses: gittools/actions/gitversion/setup@v4.7.0
         with:
           versionSpec: '6.x'
 
       - name: Determine version
         id: gitversion
-        uses: gittools/actions/gitversion/execute@v3
+        uses: gittools/actions/gitversion/execute@v4.7.0
         with:
           useConfigFile: true
 
       - name: Display version
         run: |
           echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
-          echo "NuGetVersion: ${{ steps.gitversion.outputs.nuGetVersionV2 }}"
 
       # Base version: typed input for manual runs, GitVersion otherwise.
       # GitVersion's CommitsSinceVersionSource is appended as build number:
@@ -87,7 +89,7 @@ jobs:
         run: dotnet pack ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./nupkg /p:PackageVersion=${{ steps.version.outputs.value }}
 
       - name: Upload NuGet artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: nuget-packages
           path: ./nupkg/*.nupkg
@@ -98,13 +100,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download NuGet artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: nuget-packages
           path: ./nupkg
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -126,44 +128,51 @@ jobs:
   publish-github-release:
     needs: build-and-test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          fetch-depth: 0  # Full history needed for the commit changelog
+          fetch-depth: 0  # Full history needed for the changelog extraction
 
       - name: Download NuGet artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: nuget-packages
           path: ./nupkg
 
-      # generate_release_notes only lists merged PRs (this repo has none),
-      # so build the notes from the commits since the previous tag instead.
+      # Release notes come from the maintained CHANGELOG.md (Keep a Changelog):
+      # the section of the released version, or [Unreleased] when the version
+      # has no section yet. Content only, no section headers, no commit messages.
       - name: Build release notes
         run: |
-          TAG="v${{ needs.build-and-test.outputs.version }}"
+          VERSION="${{ needs.build-and-test.outputs.version }}"
+          BASE=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?$/\1/')
+          TAG="v$VERSION"
           if [ "${{ github.event_name }}" = "push" ]; then
             PREV=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
           else
             PREV=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           fi
-          {
-            if [ -n "$PREV" ]; then
-              echo "## What's changed since $PREV"
-              echo ""
-              git log --pretty=format:"- %h %s" "$PREV"..HEAD
-              echo ""
+          if grep -q "^## \[$BASE\]" CHANGELOG.md; then SECTION="$BASE"; else SECTION="Unreleased"; fi
+          awk -v sec="$SECTION" '
+            /^## \[/ { show = (index($0, "## [" sec "]") == 1); next }
+            show { print }
+          ' CHANGELOG.md | sed '/./,$!d' > notes.md
+          if [ ! -s notes.md ]; then
+            echo "No user-facing changes recorded in CHANGELOG.md for $BASE." > notes.md
+          fi
+          if [ -n "$PREV" ]; then
+            {
               echo ""
               echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV...$TAG"
-            else
-              echo "Initial release."
-            fi
-          } > notes.md
+            } >> notes.md
+          fi
           cat notes.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ needs.build-and-test.outputs.version }}
           body_path: notes.md

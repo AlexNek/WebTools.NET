@@ -28,6 +28,23 @@ The returned `WebContent` record:
 | `ErrorMessage` | Failure reason when `Success` is `false` |
 | `FinalUrl` | The URL of the page after redirects |
 
+## Limiting Content Length
+
+By default `FetchAsync` returns the full page content without truncation.
+Pass `maxContentLength` to limit the output to a specific number of characters:
+
+```csharp
+// Get at most 8000 characters of content
+var content = await fetcher.FetchAsync("https://test.example.com", maxContentLength: 8000);
+```
+
+The returned content is cut to exactly the specified character count — no
+truncation indicator is appended. If you need to signal to downstream
+consumers that content was trimmed, append your own suffix after the call.
+
+Passing `null` (the default) returns everything. Passing a value ≤ 0 throws
+`ArgumentOutOfRangeException`.
+
 ## Engine Implementations
 
 | Engine | Implementation |

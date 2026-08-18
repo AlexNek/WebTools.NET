@@ -17,8 +17,6 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
 
     private const int ChallengeWaitMs = 30_000;
 
-    private const int ContentLimit = 8000;
-
     private const int ErrorContentLimit = 3000;
 
     private const int FallbackNetworkIdleWaitMs = 10_000;
@@ -160,8 +158,13 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
         _fallbackLock.Dispose();
     }
 
-    public async Task<WebContent> FetchAsync(string url, CancellationToken ct = default)
+    public async Task<WebContent> FetchAsync(string url, int? maxContentLength = null, CancellationToken ct = default)
     {
+        if (maxContentLength is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxContentLength), maxContentLength, "Value must be a positive integer or null.");
+        }
+
         IPage? page = null;
         try
         {
@@ -197,7 +200,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
                     return new WebContent(false, "", "Blocked by bot protection", finalUrl);
                 }
 
-                return await NonHeadlessFetchFallbackAsync(url, ct);
+                return await NonHeadlessFetchFallbackAsync(url, maxContentLength, ct);
             }
 
             // Give JS a moment to render, but don't wait for full NetworkIdle
@@ -216,12 +219,13 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
             finalUrl = page.Url;
             status = response?.Status ?? 0;
             var body = await page.TextContentAsync("body") ?? "";
+            var stripped = HtmlUtils.StripHtml(body);
 
             if (HtmlUtils.IsErrorPageUrl(finalUrl) && status >= 200 && status < 300)
             {
                 return new WebContent(
                     false,
-                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
+                    HtmlUtils.Truncate(stripped, ErrorContentLimit),
                     $"Redirected to error page ({finalUrl})",
                     finalUrl);
             }
@@ -230,14 +234,14 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
             {
                 return new WebContent(
                     false,
-                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
+                    HtmlUtils.Truncate(stripped, ErrorContentLimit),
                     $"HTTP {status}",
                     finalUrl);
             }
 
             return new WebContent(
                 true,
-                HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ContentLimit),
+                HtmlUtils.TruncateIfNeeded(stripped, maxContentLength),
                 null,
                 finalUrl);
         }
@@ -353,7 +357,7 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
         }
     }
 
-    private Task<WebContent> NonHeadlessFetchFallbackAsync(string url, CancellationToken ct)
+    private Task<WebContent> NonHeadlessFetchFallbackAsync(string url, int? maxContentLength, CancellationToken ct)
     {
         return WithNonHeadlessBrowserAsync(
             url,
@@ -379,19 +383,20 @@ public sealed class PlaywrightContentFetcher : IWebContentFetcher
 
                 finalUrl = page.Url;
                 var body = await page.TextContentAsync("body") ?? "";
+                var stripped = HtmlUtils.StripHtml(body);
 
                 if (status < 200 || status >= 300)
                 {
                     return new WebContent(
                         false,
-                        HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ErrorContentLimit),
+                        HtmlUtils.Truncate(stripped, ErrorContentLimit),
                         $"HTTP {status}",
                         finalUrl);
                 }
 
                 return new WebContent(
                     true,
-                    HtmlUtils.Truncate(HtmlUtils.StripHtml(body), ContentLimit),
+                    HtmlUtils.TruncateIfNeeded(stripped, maxContentLength),
                     null,
                     finalUrl);
             });
