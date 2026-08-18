@@ -1,5 +1,5 @@
-next-version: 0.1.0
-mode: ContinuousDeployment
+next-version: 1.0.0
+mode: ContinuousDelivery
 assembly-versioning-scheme: MajorMinorPatch
 assembly-file-versioning-scheme: MajorMinorPatch
 tag-prefix: '[vV]?'
@@ -10,11 +10,11 @@ commit-message-incrementing: Disabled
 branches:
   master:
     regex: ^master$
-    label: ''
+    label: ~
     increment: None
   main:
     regex: ^main$
-    label: ''
+    label: ~
     increment: None
   develop:
     regex: ^dev(elop)?(ment)?$

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `IWebContentFetcher.FetchAsync` now returns full content by default (no truncation); pass the new optional `maxContentLength` parameter to limit output to a specific character count
+
 ## [1.0.0] - 2026-08-13
 
 ### Added
