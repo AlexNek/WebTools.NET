@@ -3,6 +3,15 @@
 `GeoRegionService` detects the broad region where the application is running,
 so callers can choose region-appropriate endpoints and sources.
 
+## Migrating from `GeoRegionAgent`
+
+`GeoRegionAgent` remains available as an obsolete forwarding wrapper. Prefer
+`GeoRegionService` for new code. When an `HttpClient` is injected, both the
+legacy wrapper and the preferred service leave it caller-owned; only an
+internally created client is disposed by the owning service. See the
+[Migration from Agent APIs](../getting-started/migration.md) guide for the
+complete mapping.
+
 ## Regions
 
 | Region code | Meaning |

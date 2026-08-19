@@ -87,5 +87,7 @@ Built-in browser sessions serialize page operations, reset, and disposal through
 a lifecycle gate. If a session deadline interrupts an in-flight operation, a
 reset cannot close its page or context concurrently with that operation.
 
-See [Caller Integration](caller-integration.md) for composition patterns and
+See [Caller Integration](caller-integration.md) for composition patterns,
+[Migration from Agent APIs](../getting-started/migration.md) for legacy-name
+mappings and ownership differences, and
 [Core Interfaces](../api-reference/interfaces.md) for the public contracts.

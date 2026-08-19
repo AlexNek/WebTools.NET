@@ -43,6 +43,7 @@ nav:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quick-start.md
       - Dependency Injection: getting-started/dependency-injection.md
+      - Migration from Agent APIs: getting-started/migration.md
   - Concepts:
       - Browser Engines: concepts/browser-engines.md
       - Error Handling: concepts/error-handling.md

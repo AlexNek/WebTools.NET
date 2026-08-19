@@ -45,6 +45,9 @@ Every operation returns a result object (`SearchResult`, `WebContent`,
   and the [Quick Start](getting-started/quick-start.md).
 - Choosing between browser backends? Read
   [Browser Engines](concepts/browser-engines.md).
+- Migrating an existing application? Start with the
+  [Migration from Agent APIs](getting-started/migration.md) guide; the former
+  names remain available as obsolete compatibility shims.
 - Looking for a specific type? Check the
   [API Reference](api-reference/interfaces.md).
 

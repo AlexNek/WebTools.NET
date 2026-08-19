@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing applications can migrate without an immediate source-breaking
   upgrade. New browser sessions use explicit external ownership.
 
+- Updated the README, API reference, DI getting-started guide, and browser-session refactor documents to explain the caller-agnostic architecture, external session ownership, old/new DI contracts, obsolete API mappings, and incremental migration. Documentation examples use the preferred session/service names while compatibility behavior remains documented.
+
 ### Deprecated
 
 The following obsolete names are retained for migration:

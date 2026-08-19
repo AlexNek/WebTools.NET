@@ -78,6 +78,8 @@ foreach (var link in links)
 
 ## Next Steps
 
+- [Migration from Agent APIs](migration.md) — old-to-new names, ownership
+  differences, DI compatibility, and an incremental migration order
 - [Web Search](../search/overview.md) — providers, fallback queries
 - [Content Fetching](../content-fetching/overview.md) — engines and timeouts
 - [WebNavigationService](../navigation/web-navigation-service.md) — navigation

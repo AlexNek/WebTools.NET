@@ -4,6 +4,15 @@
 which links actually work. It is a caller-agnostic service; it does not own or
 create a browser session.
 
+## Migrating from `WebNavigationAgent`
+
+`WebNavigationAgent` remains available as an obsolete forwarding wrapper. Prefer
+`WebNavigationService` for new code. The injected legacy constructor leaves the
+supplied browser caller-owned, while the parameterless legacy constructor
+retains its historical internally created Playwright session. See the
+[Migration from Agent APIs](../getting-started/migration.md) guide for the
+complete mapping.
+
 ## Construction
 
 ```csharp

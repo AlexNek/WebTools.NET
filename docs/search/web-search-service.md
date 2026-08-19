@@ -4,6 +4,15 @@
 automatic fallback query generation when a search returns no results. It does
 not create or dispose the provider.
 
+## Migrating from `WebSearchAgent`
+
+`WebSearchAgent` remains available as an obsolete forwarding wrapper. Prefer
+`WebSearchService` for new code. The injected legacy constructor leaves the
+supplied provider caller-owned, while the parameterless legacy constructor
+retains its historical internally created browser provider. See the
+[Migration from Agent APIs](../getting-started/migration.md) guide for the
+complete mapping.
+
 ## Construction
 
 ```csharp
@@ -43,8 +52,8 @@ The first fallback that yields results wins. If all attempts fail, the last
 `SearchResult` is returned unchanged — callers should still check `Success`.
 
 ```csharp
-var result = await search.SearchAsync("canteen menu API");
-// Internally: "canteen menu API" -> "canteen menu" -> "canteen menu official site"
+var result = await search.SearchAsync("example API query");
+// Internally: "example API query" -> "example query" -> "example API query official site"
 
 if (!result.Success)
 {
