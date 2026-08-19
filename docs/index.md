@@ -1,20 +1,23 @@
 # WebTools.NET Developer Manual
 
-Web tools for .NET agents: web search, browser-based content fetching, and navigation.
+Web tools for .NET applications: web search, browser-based content fetching,
+navigation, and caller-controlled browser sessions.
 
-WebTools.NET is a NuGet library that gives AI agents and automation tools
-reliable access to the web — searching, fetching page content, checking URL
-reachability, and autonomous navigation — with a choice of browser engines.
+WebTools.NET is a NuGet library that gives applications, workflows, and
+orchestration layers reliable access to the web — searching, fetching page
+content, checking URL reachability, and navigating with a choice of browser
+engines.
 
 ## Feature Overview
 
 | Capability | Entry point | Description |
 | --- | --- | --- |
-| Web search | `WebSearchAgent`, `IWebSearchProvider` | Search the web via DuckDuckGo (HTTP) or browser-based providers |
+| Web search | `WebSearchService`, `IWebSearchProvider` | Search the web via DuckDuckGo (HTTP) or browser-based providers |
 | Content fetching | `IWebContentFetcher` | Retrieve rendered page content through headless browsers |
 | URL reachability | `IWebAccessService` | Plain-HTTP reachability checks with redirect tracking |
-| Navigation | `WebNavigationAgent` | Autonomous link extraction and same-host navigation |
-| Geo-awareness | `GeoRegionAgent` | IP-based region detection with locale fallback |
+| Navigation | `WebNavigationService` | Same-host link extraction and navigation |
+| Browser session | `BrowserSession` | Caller-controlled stateful browser operations and snapshots |
+| Geo-awareness | `GeoRegionService` | IP-based region detection with locale fallback |
 | Dependency injection | `AddWebToolsCore()`, `AddBrowserServices()` | One-line integration via `IServiceCollection` extensions |
 
 ## Architecture at a Glance
@@ -24,9 +27,9 @@ namespace, so you can depend on interfaces and swap implementations:
 
 ```mermaid
 graph LR
-    A[WebSearchAgent] --> B[IWebSearchProvider]
+    A[WebSearchService] --> B[IWebSearchProvider]
     C[IWebAccessService] --> D[IWebContentFetcher]
-    E[WebNavigationAgent] --> F[IBrowserInteraction]
+    E[WebNavigationService] --> F[IBrowserInteraction]
     B --> G[DuckDuckGo / Playwright / CloakBrowser providers]
     D --> H[PlaywrightContentFetcher / CloakBrowserContentFetcher]
     F --> I[PlaywrightSession / CloakBrowserSession]

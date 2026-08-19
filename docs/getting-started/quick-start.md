@@ -35,7 +35,7 @@ Console.WriteLine(check.Reachable ? "Reachable" : check.ErrorMessage);
 using WebTools.NET.Search;
 
 using var ddg = new DuckDuckGoSearchProvider();
-await using var search = new WebSearchAgent(ddg);
+var search = new WebSearchService(ddg);
 
 var result = await search.SearchAsync("dotnet web scraping", maxResults: 5);
 if (result.Success)
@@ -64,10 +64,12 @@ if (content.Success)
 
 ```csharp
 using WebTools.NET;
+using WebTools.NET.Browsing;
 
-await using var agent = new WebNavigationAgent();
+await using var browser = new PlaywrightSession();
+var navigation = new WebNavigationService(browser);
 
-var links = await agent.NavigateAsync("https://test.example.com", maxLinks: 20);
+var links = await navigation.NavigateAsync("https://test.example.com", maxLinks: 20);
 foreach (var link in links)
 {
     Console.WriteLine(link);   // verified reachable same-host links
@@ -78,5 +80,5 @@ foreach (var link in links)
 
 - [Web Search](../search/overview.md) — providers, fallback queries
 - [Content Fetching](../content-fetching/overview.md) — engines and timeouts
-- [WebNavigationAgent](../navigation/web-navigation-agent.md) — navigation
+- [WebNavigationService](../navigation/web-navigation-service.md) — navigation
   behavior in detail

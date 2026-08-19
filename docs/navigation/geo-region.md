@@ -1,7 +1,7 @@
 # Geo-awareness
 
-`GeoRegionAgent` detects the broad region the application is running in, so
-agents can pick region-appropriate endpoints and sources.
+`GeoRegionService` detects the broad region where the application is running,
+so callers can choose region-appropriate endpoints and sources.
 
 ## Regions
 
@@ -33,7 +33,7 @@ the cached value without network traffic.
 ```csharp
 using WebTools.NET.Geo;
 
-using var geo = new GeoRegionAgent();
+using var geo = new GeoRegionService();
 var region = await geo.DetectRegionAsync();
 
 var source = region switch
@@ -44,11 +44,11 @@ var source = region switch
 ```
 
 The constructor accepts an optional `HttpClient` (for testing) and an
-optional `ILogger<GeoRegionAgent>`.
+optional `ILogger<GeoRegionService>`.
 
 ## The Abstraction
 
-`GeoRegionAgent` implements `IGeoRegionProvider`, so components that only
+`GeoRegionService` implements `IGeoRegionProvider`, so components that only
 need the region can depend on the interface instead:
 
 ```csharp

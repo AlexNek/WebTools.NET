@@ -1,11 +1,11 @@
 # Web Search Overview
 
 Web search is built around the `IWebSearchProvider` abstraction and the
-`WebSearchAgent` orchestrator.
+`WebSearchService` fallback service.
 
 ```mermaid
 graph LR
-    A[WebSearchAgent] -->|fallback queries| B[IWebSearchProvider]
+    A[WebSearchService] -->|fallback queries| B[IWebSearchProvider]
     B --> C[DuckDuckGoSearchProvider]
     B --> D[PlaywrightSearchProvider]
     B --> E[CloakBrowserSearchProvider]
@@ -15,7 +15,7 @@ graph LR
 
 | Entry point | Use it when |
 | --- | --- |
-| `WebSearchAgent` | You want automatic fallback queries on empty results |
+| `WebSearchService` | You want automatic fallback queries on empty results |
 | `IWebSearchProvider` (any implementation) | You want a single raw search call |
 
 ## The Search Contract
@@ -39,9 +39,9 @@ on failure — see [Error Handling](../concepts/error-handling.md).
 using WebTools.NET.Search;
 
 using var ddg = new DuckDuckGoSearchProvider();
-await using var agent = new WebSearchAgent(ddg);
+var search = new WebSearchService(ddg);
 
-var result = await agent.SearchAsync(".NET dependency injection", maxResults: 10);
+var result = await search.SearchAsync(".NET dependency injection", maxResults: 10);
 if (result.Success)
 {
     foreach (var item in result.Results)
@@ -55,4 +55,4 @@ if (result.Success)
 ## Provider Details
 
 See [Search Providers](providers.md) for the tradeoffs of each provider, and
-[WebSearchAgent](web-search-agent.md) for fallback behavior.
+[WebSearchService](web-search-service.md) for fallback behavior.

@@ -72,6 +72,85 @@ public interface IBrowserInteraction : IAsyncDisposable
 
 Implementations: `PlaywrightSession`, `CloakBrowserSession`.
 
+## IBrowserSession
+
+Composite browser-session capabilities used by `BrowserSession`. Extends
+`IBrowserInteraction` so low-level browser consumers remain compatible.
+
+```csharp
+public interface IBrowserSession : IBrowserInteraction
+{
+    Task<IReadOnlyList<InteractiveElement>> GetInteractiveElementsAsync(CancellationToken ct = default);
+    Task GoBackAsync(CancellationToken ct = default);
+    Task<bool> IsCheckedAsync(string selector, CancellationToken ct = default);
+    Task<int?> GetLastNavigationStatusAsync(CancellationToken ct = default);
+    Task<bool> HasMoreContentAsync(CancellationToken ct = default);
+    Task LoadStorageStateAsync(string path, CancellationToken ct = default);
+    Task SaveStorageStateAsync(string path, CancellationToken ct = default);
+    Task<string> ScreenshotAsync(CancellationToken ct = default);
+    Task ScrollAsync(int deltaY, CancellationToken ct = default);
+    Task SelectOptionAsync(string selector, string value, CancellationToken ct = default);
+    Task SubmitFormAsync(string selector, CancellationToken ct = default);
+    Task WaitForSelectorAsync(string selector, int timeoutMs, CancellationToken ct = default);
+}
+```
+
+Implementations: `PlaywrightSession`, `CloakBrowserSession`.
+
+The composite is intentionally split into smaller capability interfaces for consumers
+that do not need the full session surface: `IBrowserElementExtractor`,
+`IBrowserHistoryNavigation`, `IBrowserFormInteraction`, `IBrowserNavigationStatus`,
+`IBrowserSessionStorage`, `IBrowserScreenshot`, `IBrowserViewport`, and
+`IBrowserPageWaiter`.
+
+## IBrowserSessionFactory
+
+Creates a fresh, unstarted browser session for each independent workflow. The
+caller passes the returned session to `BrowserSession` and owns its lifetime.
+
+```csharp
+public interface IBrowserSessionFactory
+{
+    IBrowserSession Create();
+}
+```
+
+`BrowserSessionFactory` selects `PlaywrightSession` or `CloakBrowserSession` and
+never caches the returned session.
+
+## Compatibility contracts
+
+The former browser-agent contracts remain available as obsolete compatibility
+shims so existing applications can migrate without an immediate source break:
+
+| Legacy contract | Preferred contract |
+| --- | --- |
+| `IBrowserAgentInteraction` | `IBrowserSession` |
+| `IBrowserAgentSessionFactory` | `IBrowserSessionFactory` |
+
+`IBrowserSession` inherits the legacy composite capability surface, so built-in
+sessions satisfy both contracts. `IBrowserAgentSessionFactory` returns the same
+current session implementations through the legacy interface. Prefer the
+session names for new code.
+
+## IBrowserSessionState
+
+Optional lifecycle state exposed by built-in sessions:
+
+```csharp
+public interface IBrowserSessionState
+{
+    bool IsPageReady { get; }
+}
+```
+
+## BrowserSessionOptions
+
+`BrowserSessionOptions` configures session limits, content format, screenshots,
+storage persistence, and browser context viewport. The default viewport is
+1920×1080; pass it to `PlaywrightSession`, `CloakBrowserSession`, or
+`BrowserSession`.
+
 ## IGeoRegionProvider
 
 Region detection.
@@ -83,7 +162,7 @@ public interface IGeoRegionProvider
 }
 ```
 
-Implementation: `GeoRegionAgent`. Returns one of `us`, `eu`, `china`, `intl`.
+Implementation: `GeoRegionService`. Returns one of `us`, `eu`, `china`, `intl`.
 
 ## EBrowserEngine
 

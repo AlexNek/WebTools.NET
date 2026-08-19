@@ -18,7 +18,7 @@ signals. See [Browser Engines](concepts/browser-engines.md).
 ## Do I need Playwright browser binaries for every feature?
 
 No. `DuckDuckGoSearchProvider` and `WebAccessService` are plain HTTP. Only
-content fetching, browser search providers, and `WebNavigationAgent` drive a
+content fetching, browser search providers, and `WebNavigationService` drive a
 browser. See [Installation](getting-started/installation.md).
 
 ## Why does my fetch/search return `Success = false` without an exception?
@@ -29,18 +29,18 @@ By design. WebTools.NET reports operational failures through result objects
 
 ## Why does NavigateAsync return only same-host links?
 
-The navigation agent is designed for exploring one site at a time. Cross-host
+The navigation service is designed for exploring one site at a time. Cross-host
 links are dropped during extraction, and returned links are verified for
 reachability first. See
-[WebNavigationAgent](navigation/web-navigation-agent.md).
+[WebNavigationService](navigation/web-navigation-service.md).
 
 ## Can I use the library without dependency injection?
 
-Yes. All agents have public constructors and a parameterless convenience
-constructor that creates and owns a default Playwright-based dependency. See
+Yes. Browser-backed services accept caller-supplied browser sessions or
+providers, and the caller manages those dependencies. See
 [Dependency Injection](getting-started/dependency-injection.md#manual-construction-without-di).
 
-## How do I debug what the agents are doing?
+## How do I debug what the services are doing?
 
 Pass an `ILogger<T>` to the constructor (or register logging before
 `AddBrowserServices`) and enable `Debug` level for `WebTools.NET` types.

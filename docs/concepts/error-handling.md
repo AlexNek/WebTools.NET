@@ -1,8 +1,8 @@
 # Error Handling
 
 WebTools.NET follows a result-object pattern: operations report failure
-through the returned model instead of throwing exceptions. This keeps agent
-pipelines free of try/catch noise and makes fallback logic explicit.
+through the returned model instead of throwing exceptions. This keeps caller
+pipelines free of unnecessary try/catch noise and makes fallback logic explicit.
 
 ## Result Objects
 
@@ -34,16 +34,18 @@ hosts, bot blocks). Exceptions are still thrown for programming errors:
 - `UriFormatException` when a caller passes a malformed URL to lower-level
   APIs such as link extraction
 
-## Defensive Agent Behavior
+## Service Behavior
 
-The agents add their own resilience on top of result objects:
+The services add focused resilience on top of result objects:
 
-- `WebSearchAgent` retries with generated fallback queries when a search
-  returns no results (see [WebSearchAgent](../search/web-search-agent.md))
-- `WebNavigationAgent` returns an empty list instead of throwing when
+- `WebSearchService` retries with generated fallback queries when a search
+  returns no results (see [WebSearchService](../search/web-search-service.md))
+- `WebNavigationService` returns an empty list instead of throwing when
   navigation or link extraction fails
-- `GeoRegionAgent` falls back to the system locale when the Geo-IP lookup
+- `GeoRegionService` falls back to the system locale when the Geo-IP lookup
   fails (see [Geo-awareness](../navigation/geo-region.md))
+- `BrowserSession` returns recoverable browser and page failures through
+  `BrowserSnapshot.Error`; caller cancellation is propagated
 
 ## Logging
 

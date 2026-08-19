@@ -1,29 +1,23 @@
-# WebSearchAgent
+# WebSearchService
 
-`WebSearchAgent` wraps any `IWebSearchProvider` and adds automatic fallback
-query generation when a search returns no results.
+`WebSearchService` wraps a caller-supplied `IWebSearchProvider` and adds
+automatic fallback query generation when a search returns no results. It does
+not create or dispose the provider.
 
 ## Construction
 
 ```csharp
-// Owns a PlaywrightSearchProvider internally
-await using var agent1 = new WebSearchAgent();
-
-// Wraps any provider; caller owns its lifetime
+// The caller creates and owns the provider.
 using var ddg = new DuckDuckGoSearchProvider();
-await using var agent2 = new WebSearchAgent(ddg);
+var search = new WebSearchService(ddg);
 ```
 
-Both constructors also accept an optional `ILogger<WebSearchAgent>`.
-
-!!! note
-    `DisposeAsync` only disposes the provider when the agent created it
-    itself. Providers passed into the constructor remain your responsibility.
+The constructor also accepts an optional `ILogger<WebSearchService>`.
 
 ## Searching
 
 ```csharp
-var result = await agent.SearchAsync(
+var result = await search.SearchAsync(
     "weather API",
     maxResults: 10,
     ct: cancellationToken);
@@ -37,7 +31,7 @@ var result = await agent.SearchAsync(
 
 ## Fallback Query Strategy
 
-When the initial query produces a failed or empty result, the agent retries
+When the initial query produces a failed or empty result, the service retries
 with generated variations:
 
 | Original query | Fallback attempts (in order) |
@@ -49,7 +43,7 @@ The first fallback that yields results wins. If all attempts fail, the last
 `SearchResult` is returned unchanged — callers should still check `Success`.
 
 ```csharp
-var result = await agent.SearchAsync("canteen menu API");
+var result = await search.SearchAsync("canteen menu API");
 // Internally: "canteen menu API" -> "canteen menu" -> "canteen menu official site"
 
 if (!result.Success)
