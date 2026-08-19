@@ -15,6 +15,10 @@ public sealed class CloakBrowserSession : IBrowserInteraction
 
     private const int ReachabilityTimeoutMs = 10000;
 
+    private const int ScrollNetworkIdleMs = 3000;
+
+    private const int WaitForSelectorDefaultMs = 5000;
+
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
     private Microsoft.Playwright.IBrowser? _browser;
@@ -114,6 +118,24 @@ public sealed class CloakBrowserSession : IBrowserInteraction
         return await page.ContentAsync();
     }
 
+    public async Task<string> GetTitleAsync(CancellationToken ct = default)
+    {
+        var page = await GetPageAsync(ct);
+        return await page.TitleAsync();
+    }
+
+    public async Task GoBackAsync(CancellationToken ct = default)
+    {
+        var page = await GetPageAsync(ct);
+        await page.GoBackAsync(new Microsoft.Playwright.PageGoBackOptions { Timeout = NavigateTimeoutMs });
+    }
+
+    public Task LoadStorageStateAsync(string path, CancellationToken ct = default)
+    {
+        // Storage state is applied during context creation — no-op after init.
+        return Task.CompletedTask;
+    }
+
     public async Task NavigateAsync(string url, CancellationToken ct = default)
     {
         var page = await GetPageAsync(ct);
@@ -124,6 +146,69 @@ public sealed class CloakBrowserSession : IBrowserInteraction
                     WaitUntil = Microsoft.Playwright.WaitUntilState.NetworkIdle,
                     Timeout = NavigateTimeoutMs
                 });
+    }
+
+    public async Task SaveStorageStateAsync(string path, CancellationToken ct = default)
+    {
+        var page = await GetPageAsync(ct);
+        var context = page.Context;
+        await context.StorageStateAsync(new Microsoft.Playwright.BrowserContextStorageStateOptions { Path = path });
+    }
+
+    public async Task<string> ScreenshotAsync(CancellationToken ct = default)
+    {
+        var page = await GetPageAsync(ct);
+        var bytes = await page.ScreenshotAsync(new Microsoft.Playwright.PageScreenshotOptions { FullPage = false });
+        return Convert.ToBase64String(bytes);
+    }
+
+    public async Task ScrollAsync(int deltaY, CancellationToken ct = default)
+    {
+        var page = await GetPageAsync(ct);
+        await page.Mouse.WheelAsync(0, deltaY);
+
+        try
+        {
+            await page.WaitForLoadStateAsync(
+                Microsoft.Playwright.LoadState.NetworkIdle,
+                new Microsoft.Playwright.PageWaitForLoadStateOptions { Timeout = ScrollNetworkIdleMs });
+        }
+        catch (TimeoutException)
+        {
+            // Fine — not all pages trigger network requests on scroll
+        }
+    }
+
+    public async Task SelectOptionAsync(string selector, string value, CancellationToken ct = default)
+    {
+        var page = await GetPageAsync(ct);
+        await page.SelectOptionAsync(selector, new Microsoft.Playwright.SelectOptionValue { Label = value });
+    }
+
+    public async Task SubmitFormAsync(string selector, CancellationToken ct = default)
+    {
+        var page = await GetPageAsync(ct);
+        await page.EvalOnSelectorAsync(
+            selector,
+            "el => { const form = el.closest('form'); if (form) form.submit(); }");
+
+        try
+        {
+            await page.WaitForLoadStateAsync(
+                Microsoft.Playwright.LoadState.NetworkIdle,
+                new Microsoft.Playwright.PageWaitForLoadStateOptions { Timeout = NetworkIdleTimeoutMs });
+        }
+        catch (TimeoutException)
+        {
+            // Proceed — some forms use AJAX without full navigation
+        }
+    }
+
+    public async Task WaitForSelectorAsync(string selector, int timeoutMs, CancellationToken ct = default)
+    {
+        var page = await GetPageAsync(ct);
+        var timeout = timeoutMs > 0 ? timeoutMs : WaitForSelectorDefaultMs;
+        await page.WaitForSelectorAsync(selector, new Microsoft.Playwright.PageWaitForSelectorOptions { Timeout = timeout });
     }
 
     private async Task<Microsoft.Playwright.IPage> GetPageAsync(CancellationToken ct)

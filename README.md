@@ -34,6 +34,7 @@ and retry or fall back on its own terms.
 | Content fetching | `IWebContentFetcher` | Rendered page text extracted through a headless browser |
 | URL reachability | `IWebAccessService` | Plain-HTTP check with redirect tracking — no browser needed |
 | Interactive browsing | `IBrowserInteraction` | Navigate, fill forms, click, and read the resulting page |
+| **Browser agent** | `BrowserAgent` | Stateful multi-turn agent: LLM decides actions, agent executes and returns page snapshots |
 | Autonomous navigation | `WebNavigationAgent` | Same-host link extraction and verification |
 | Geo-awareness | `GeoRegionAgent` | IP-based region detection with locale fallback, cached |
 | Dependency injection | `AddWebToolsCore()`, `AddBrowserServices()` | One-line `IServiceCollection` integration |
@@ -148,6 +149,43 @@ foreach (var link in workingLinks)
     Console.WriteLine(link);
 }
 ```
+
+### LLM-driven multi-turn browsing
+
+`BrowserAgent` lets an LLM autonomously navigate across multiple turns — it
+executes actions and returns a structured `PageSnapshot` after each one:
+
+```csharp
+using WebTools.NET;
+using WebTools.NET.Models;
+
+await using var agent = new BrowserAgent(new BrowserAgentOptions
+{
+    IncludeScreenshot = false,
+    StorageStatePath = "./cookies.json"   // persist login across sessions
+});
+
+var snapshot = await agent.StartAsync("https://test.example.com/login");
+
+// Fill login form in one action
+snapshot = await agent.ExecuteAsync(new BrowserAction(
+    EBrowserActionType.FillForm,
+    Fields: [
+        new FormFieldValue(2, "user@test.example.com"),
+        new FormFieldValue(3, "test-password")
+    ]));
+
+// Click submit
+snapshot = await agent.ExecuteAsync(new BrowserAction(
+    EBrowserActionType.Click, ElementIndex: 4));
+
+// snapshot.Url, snapshot.Content, snapshot.Elements are now the dashboard
+```
+
+Actions: Navigate, Click, Fill, FillForm, Select, Submit, ScrollDown, ScrollUp,
+WaitFor, Back, Snapshot. See the
+[browser agent docs](https://alexnek.github.io/WebTools.NET/browser-agent/overview/)
+for the full vocabulary.
 
 ### Detect the caller's region
 
