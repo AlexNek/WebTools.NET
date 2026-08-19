@@ -1,239 +1,68 @@
 using CloakBrowser;
 
-using WebTools.NET.Abstractions;
+using Microsoft.Playwright;
+
 using WebTools.NET.Internal;
+using WebTools.NET.Models;
 
 namespace WebTools.NET.Browsing;
 
-public sealed class CloakBrowserSession : IBrowserInteraction
+/// <summary>
+/// Browser session implementation using CloakBrowser for anti-detection.
+/// </summary>
+public sealed class CloakBrowserSession : BrowserSessionBase
 {
-    private const int ClickTimeoutMs = 5000;
-
-    private const int NavigateTimeoutMs = 15000;
-
-    private const int NetworkIdleTimeoutMs = 10000;
-
-    private const int ReachabilityTimeoutMs = 10000;
-
-    private const int ScrollNetworkIdleMs = 3000;
-
-    private const int WaitForSelectorDefaultMs = 5000;
-
-    private readonly SemaphoreSlim _initLock = new(1, 1);
-
-    private Microsoft.Playwright.IBrowser? _browser;
+    private readonly bool _headless;
 
     private CloakBrowserHandle? _handle;
 
-    private Microsoft.Playwright.IPage? _page;
-
-    public async Task<bool> CheckReachabilityAsync(string url, CancellationToken ct = default)
+    public CloakBrowserSession(
+        string? storageStatePath = null,
+        bool headless = true,
+        BrowserSessionOptions? options = null)
+        : base(storageStatePath, options)
     {
+        _headless = headless;
+    }
+
+    protected override async Task<(IBrowserContext Context, IPage Page)> CreatePageAsync(CancellationToken ct)
+    {
+        _handle ??= await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = _headless })
+            .AwaitWithCancellationAsync(ct)
+            .ConfigureAwait(false);
+
+        var browser = _handle.RawBrowser;
+        IBrowserContext? context = null;
         try
         {
-            var page = await GetPageAsync(ct);
-            var response = await page.GotoAsync(
-                               url,
-                               new Microsoft.Playwright.PageGotoOptions
-                                   {
-                                       WaitUntil =
-                                           Microsoft.Playwright.WaitUntilState.DOMContentLoaded,
-                                       Timeout = ReachabilityTimeoutMs
-                                   });
-
-            var status = response?.Status ?? 0;
-            if (HttpStatusHelper.IsNotSuccess(status)) return false;
-
-            var finalUrl = page.Url;
-            return !HtmlUtils.IsErrorPageUrl(finalUrl);
+            context = await browser.NewContextAsync(CreateContextOptions(StorageStatePath))
+                .AwaitWithCancellationAsync(ct)
+                .ConfigureAwait(false);
+            var page = await context.NewPageAsync().AwaitWithCancellationAsync(ct).ConfigureAwait(false);
+            var created = (Context: context, Page: page);
+            context = null;
+            return created;
         }
         catch
         {
-            return false;
+            await CloseContextAsync(context).ConfigureAwait(false);
+            throw;
         }
     }
 
-    public async Task ClickAsync(string selector, CancellationToken ct = default)
+    protected override async Task DisposeResourcesAsync()
     {
-        var page = await GetPageAsync(ct);
-        await page.ClickAsync(
-            selector,
-            new Microsoft.Playwright.PageClickOptions { Timeout = ClickTimeoutMs });
-        await page.WaitForLoadStateAsync(
-            Microsoft.Playwright.LoadState.NetworkIdle,
-            new Microsoft.Playwright.PageWaitForLoadStateOptions
-                {
-                    Timeout = NetworkIdleTimeoutMs
-                });
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_page is not null)
-            try
-            {
-                await _page.CloseAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-
         if (_handle is not null)
+        {
             try
             {
                 await _handle.DisposeAsync().ConfigureAwait(false);
             }
-            catch (ObjectDisposedException)
+            catch (Exception ex) when (ex is ObjectDisposedException or TimeoutException or PlaywrightException)
             {
             }
+        }
 
-        _page = null;
-        _browser = null;
         _handle = null;
-        _initLock.Dispose();
-    }
-
-    public async Task FillAsync(string selector, string value, CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        await page.FillAsync(selector, value);
-    }
-
-    public async Task<string> GetContentAsync(CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        var body = await page.TextContentAsync("body") ?? "";
-        return HtmlUtils.StripHtml(body);
-    }
-
-    public async Task<string> GetCurrentUrlAsync(CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        return page.Url;
-    }
-
-    public async Task<string> GetHtmlAsync(CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        return await page.ContentAsync();
-    }
-
-    public async Task<string> GetTitleAsync(CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        return await page.TitleAsync();
-    }
-
-    public async Task GoBackAsync(CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        await page.GoBackAsync(new Microsoft.Playwright.PageGoBackOptions { Timeout = NavigateTimeoutMs });
-    }
-
-    public Task LoadStorageStateAsync(string path, CancellationToken ct = default)
-    {
-        // Storage state is applied during context creation — no-op after init.
-        return Task.CompletedTask;
-    }
-
-    public async Task NavigateAsync(string url, CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        await page.GotoAsync(
-            url,
-            new Microsoft.Playwright.PageGotoOptions
-                {
-                    WaitUntil = Microsoft.Playwright.WaitUntilState.NetworkIdle,
-                    Timeout = NavigateTimeoutMs
-                });
-    }
-
-    public async Task SaveStorageStateAsync(string path, CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        var context = page.Context;
-        await context.StorageStateAsync(new Microsoft.Playwright.BrowserContextStorageStateOptions { Path = path });
-    }
-
-    public async Task<string> ScreenshotAsync(CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        var bytes = await page.ScreenshotAsync(new Microsoft.Playwright.PageScreenshotOptions { FullPage = false });
-        return Convert.ToBase64String(bytes);
-    }
-
-    public async Task ScrollAsync(int deltaY, CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        await page.Mouse.WheelAsync(0, deltaY);
-
-        try
-        {
-            await page.WaitForLoadStateAsync(
-                Microsoft.Playwright.LoadState.NetworkIdle,
-                new Microsoft.Playwright.PageWaitForLoadStateOptions { Timeout = ScrollNetworkIdleMs });
-        }
-        catch (TimeoutException)
-        {
-            // Fine — not all pages trigger network requests on scroll
-        }
-    }
-
-    public async Task SelectOptionAsync(string selector, string value, CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        await page.SelectOptionAsync(selector, new Microsoft.Playwright.SelectOptionValue { Label = value });
-    }
-
-    public async Task SubmitFormAsync(string selector, CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        await page.EvalOnSelectorAsync(
-            selector,
-            "el => { const form = el.closest('form'); if (form) form.submit(); }");
-
-        try
-        {
-            await page.WaitForLoadStateAsync(
-                Microsoft.Playwright.LoadState.NetworkIdle,
-                new Microsoft.Playwright.PageWaitForLoadStateOptions { Timeout = NetworkIdleTimeoutMs });
-        }
-        catch (TimeoutException)
-        {
-            // Proceed — some forms use AJAX without full navigation
-        }
-    }
-
-    public async Task WaitForSelectorAsync(string selector, int timeoutMs, CancellationToken ct = default)
-    {
-        var page = await GetPageAsync(ct);
-        var timeout = timeoutMs > 0 ? timeoutMs : WaitForSelectorDefaultMs;
-        await page.WaitForSelectorAsync(selector, new Microsoft.Playwright.PageWaitForSelectorOptions { Timeout = timeout });
-    }
-
-    private async Task<Microsoft.Playwright.IPage> GetPageAsync(CancellationToken ct)
-    {
-        if (_page is not null)
-        {
-            return _page;
-        }
-
-        await _initLock.WaitAsync(ct);
-        try
-        {
-            if (_page is not null)
-            {
-                return _page;
-            }
-
-            _handle ??= await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = true, });
-
-            _browser = _handle.RawBrowser;
-            return _page ??= await _browser.NewPageAsync();
-        }
-        finally
-        {
-            _initLock.Release();
-        }
     }
 }

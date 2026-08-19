@@ -1,7 +1,7 @@
 namespace WebTools.NET.Models;
 
 /// <summary>
-/// A single field value for the <see cref="EBrowserActionType.FillForm"/> compound action.
+/// A single field value for the <see cref="EBrowserOperationType.FillForm"/> compound action.
 /// Supports text inputs, checkboxes (Value = "true"/"false"), and comboboxes (Value = option text).
 /// </summary>
 /// <param name="ElementIndex">Index of the interactive element to fill (1-based).</param>

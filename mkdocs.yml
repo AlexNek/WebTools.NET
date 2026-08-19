@@ -1,5 +1,5 @@
 site_name: WebTools.NET Developer Manual
-site_description: Developer manual for WebTools.NET — web search, browser content fetching, and navigation for .NET agents
+site_description: Developer manual for WebTools.NET — web search, browser content fetching, navigation, and caller-controlled browser sessions
 site_url: https://alexnek.github.io/WebTools.NET/
 repo_url: https://github.com/AlexNek/WebTools.NET
 repo_name: AlexNek/WebTools.NET
@@ -49,13 +49,16 @@ nav:
   - Web Search:
       - Overview: search/overview.md
       - Search Providers: search/providers.md
-      - WebSearchAgent: search/web-search-agent.md
+      - WebSearchService: search/web-search-service.md
   - Content Fetching:
       - Overview: content-fetching/overview.md
       - URL Reachability: content-fetching/url-reachability.md
   - Navigation:
-      - WebNavigationAgent: navigation/web-navigation-agent.md
+      - WebNavigationService: navigation/web-navigation-service.md
       - Geo-awareness: navigation/geo-region.md
+  - Browser Session:
+      - Overview: browser-session/overview.md
+      - Caller Integration: browser-session/caller-integration.md
   - API Reference:
       - Core Interfaces: api-reference/interfaces.md
       - Models: api-reference/models.md

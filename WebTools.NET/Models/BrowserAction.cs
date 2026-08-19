@@ -1,13 +1,10 @@
 namespace WebTools.NET.Models;
 
 /// <summary>
-/// Represents a single command the LLM can issue to the browser agent.
+/// Legacy browser operation model retained for source compatibility.
+/// Use <see cref="BrowserOperation"/> for new code.
 /// </summary>
-/// <param name="Type">The action to perform.</param>
-/// <param name="ElementIndex">Target element index (1-based) for Click, Fill, Select, Submit.</param>
-/// <param name="Value">Text to fill, URL to navigate to, or CSS selector to wait for.</param>
-/// <param name="Fields">Array of field values for the FillForm compound action.</param>
-/// <param name="TimeoutMs">Optional timeout override in milliseconds.</param>
+[Obsolete("Use BrowserOperation instead.")]
 public sealed record BrowserAction(
     EBrowserActionType Type,
     int? ElementIndex = null,

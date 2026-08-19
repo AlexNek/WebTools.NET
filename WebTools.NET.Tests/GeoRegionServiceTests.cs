@@ -8,7 +8,7 @@ using Xunit;
 
 namespace WebTools.NET.Tests;
 
-public class GeoRegionAgentTests
+public class GeoRegionServiceTests
 {
     [Fact]
     public async Task DetectRegionAsync_WhenApiReturnsUS_ReturnsUs()
@@ -16,7 +16,7 @@ public class GeoRegionAgentTests
         // Arrange
         var handler = new FakeHttpMessageHandler(HttpStatusCode.OK, """{"countryCode":"US"}""");
         var httpClient = new HttpClient(handler);
-        var sut = new GeoRegionAgent(httpClient);
+        var sut = new GeoRegionService(httpClient);
 
         // Act
         var result = await sut.DetectRegionAsync();
@@ -31,7 +31,7 @@ public class GeoRegionAgentTests
         // Arrange
         var handler = new FakeHttpMessageHandler(HttpStatusCode.OK, """{"countryCode":"CN"}""");
         var httpClient = new HttpClient(handler);
-        var sut = new GeoRegionAgent(httpClient);
+        var sut = new GeoRegionService(httpClient);
 
         // Act
         var result = await sut.DetectRegionAsync();
@@ -46,7 +46,7 @@ public class GeoRegionAgentTests
         // Arrange
         var handler = new FakeHttpMessageHandler(HttpStatusCode.OK, """{"countryCode":"DE"}""");
         var httpClient = new HttpClient(handler);
-        var sut = new GeoRegionAgent(httpClient);
+        var sut = new GeoRegionService(httpClient);
 
         // Act
         var result = await sut.DetectRegionAsync();
@@ -61,7 +61,7 @@ public class GeoRegionAgentTests
         // Arrange
         var handler = new FakeHttpMessageHandler(HttpStatusCode.OK, """{"countryCode":"BR"}""");
         var httpClient = new HttpClient(handler);
-        var sut = new GeoRegionAgent(httpClient);
+        var sut = new GeoRegionService(httpClient);
 
         // Act
         var result = await sut.DetectRegionAsync();
@@ -76,7 +76,7 @@ public class GeoRegionAgentTests
         // Arrange
         var handler = new FakeHttpMessageHandler(HttpStatusCode.InternalServerError, "");
         var httpClient = new HttpClient(handler);
-        var sut = new GeoRegionAgent(httpClient);
+        var sut = new GeoRegionService(httpClient);
 
         // Act
         var result = await sut.DetectRegionAsync();
@@ -100,7 +100,7 @@ public class GeoRegionAgentTests
             };
         });
         var httpClient = new HttpClient(handler);
-        var sut = new GeoRegionAgent(httpClient);
+        var sut = new GeoRegionService(httpClient);
 
         // Act
         var first = await sut.DetectRegionAsync();

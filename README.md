@@ -1,10 +1,11 @@
 # WebTools.NET
 
-Web tools for .NET agents: web search, browser-based content fetching, and navigation.
+Web tools for .NET applications: web search, browser-based content fetching, and navigation.
 
-WebTools.NET gives AI agents and automation scripts reliable access to the real
-web — searching, fetching rendered page content, checking URL reachability, and
-autonomous link navigation — through a small set of async, interface-based APIs.
+WebTools.NET gives applications and automation scripts reliable access to the
+real web — searching, fetching rendered page content, checking URL reachability,
+and caller-controlled link navigation — through a small set of async,
+interface-based APIs.
 
 ## Why WebTools.NET?
 
@@ -23,20 +24,20 @@ WebTools.NET solves this by driving real browsers (Playwright Chromium, or the
 stealth-patched CloakBrowser) behind small abstractions, while keeping
 plain-HTTP fast paths for the cases where a browser is overkill. Every
 operation returns a result object (`SearchResult`, `WebContent`,
-`UrlCheckResult`) instead of throwing, so agent code can reason about failures
+`UrlCheckResult`) instead of throwing, so caller code can reason about failures
 and retry or fall back on its own terms.
 
 ## Feature Overview
 
 | Capability | Entry point | Description |
 | --- | --- | --- |
-| Web search | `WebSearchAgent`, `IWebSearchProvider` | DuckDuckGo over plain HTTP, or search driven by a real browser |
+| Web search | `WebSearchService`, `IWebSearchProvider` | DuckDuckGo over plain HTTP, or search driven by a real browser |
 | Content fetching | `IWebContentFetcher` | Rendered page text extracted through a headless browser |
 | URL reachability | `IWebAccessService` | Plain-HTTP check with redirect tracking — no browser needed |
 | Interactive browsing | `IBrowserInteraction` | Navigate, fill forms, click, and read the resulting page |
-| **Browser agent** | `BrowserAgent` | Stateful multi-turn agent: LLM decides actions, agent executes and returns page snapshots |
-| Autonomous navigation | `WebNavigationAgent` | Same-host link extraction and verification |
-| Geo-awareness | `GeoRegionAgent` | IP-based region detection with locale fallback, cached |
+| **Browser session** | `BrowserSession` | Stateful multi-turn browser session; the external caller decides operations and receives page snapshots |
+| Autonomous navigation | `WebNavigationService` | Same-host link extraction and verification |
+| Geo-awareness | `GeoRegionService` | IP-based region detection with locale fallback, cached |
 | Dependency injection | `AddWebToolsCore()`, `AddBrowserServices()` | One-line `IServiceCollection` integration |
 
 ## Installation
@@ -67,7 +68,9 @@ var services = new ServiceCollection();
 
 services.AddWebToolsCore();   // IWebAccessService
 services.AddBrowserServices(); // IWebContentFetcher, IWebSearchProvider,
-                               // IBrowserInteraction (Playwright by default)
+                               // legacy IBrowserInteraction, and
+                               // IBrowserSessionFactory
+                               // (Playwright by default)
 
 await using var provider = services.BuildServiceProvider();
 ```
@@ -98,7 +101,7 @@ if (content.Success)
 
 ### Search the web
 
-`WebSearchAgent` wraps any `IWebSearchProvider` and automatically retries with
+`WebSearchService` wraps any `IWebSearchProvider` and automatically retries with
 fallback queries when the first attempt returns nothing:
 
 ```csharp
@@ -106,7 +109,7 @@ using WebTools.NET;
 using WebTools.NET.Search;
 
 using var ddg = new DuckDuckGoSearchProvider();   // plain HTTP, no browser
-await using var search = new WebSearchAgent(ddg);
+var search = new WebSearchService(ddg);
 
 var result = await search.SearchAsync("dotnet web scraping", maxResults: 5);
 if (result.Success)
@@ -137,54 +140,63 @@ var text = await browser.GetContentAsync();   // readable text of the result pag
 
 ### Verify links on a page
 
-`WebNavigationAgent` extracts same-host links from a page and verifies each one
+`WebNavigationService` extracts same-host links from a page and verifies each one
 in the browser:
 
 ```csharp
-await using var navAgent = new WebNavigationAgent();   // owns its own browser
+var browser = provider.GetRequiredService<IBrowserInteraction>();
+var navService = new WebNavigationService(browser);
 
-var workingLinks = await navAgent.NavigateAsync("https://test.example.com", maxLinks: 20);
+var workingLinks = await navService.NavigateAsync("https://test.example.com", maxLinks: 20);
 foreach (var link in workingLinks)
 {
     Console.WriteLine(link);
 }
 ```
 
-### LLM-driven multi-turn browsing
+### Stateful browser-session interaction
 
-`BrowserAgent` lets an LLM autonomously navigate across multiple turns — it
-executes actions and returns a structured `PageSnapshot` after each one:
+`BrowserSession` receives an explicitly created `IBrowserSession` session
+and never creates or disposes it. Create one session per independent workflow;
+the session returns a `BrowserSnapshot` after each operation, reports HTTP failures in
+`Error`, supports cancellation, and can load/save Playwright storage state when
+`StorageStatePath` is configured.
 
 ```csharp
 using WebTools.NET;
+using WebTools.NET.Browsing;
 using WebTools.NET.Models;
 
-await using var agent = new BrowserAgent(new BrowserAgentOptions
+var options = new BrowserSessionOptions
 {
     IncludeScreenshot = false,
-    StorageStatePath = "./cookies.json"   // persist login across sessions
-});
+    StorageStatePath = "./cookies.json"
+};
+var sessionFactory = new BrowserSessionFactory(
+    storageStatePath: options.StorageStatePath);
+await using var session = sessionFactory.Create();
+await using var browserSession = new BrowserSession(session, options);
 
-var snapshot = await agent.StartAsync("https://test.example.com/login");
+var snapshot = await browserSession.StartAsync("https://test.example.com/login");
 
 // Fill login form in one action
-snapshot = await agent.ExecuteAsync(new BrowserAction(
-    EBrowserActionType.FillForm,
+snapshot = await browserSession.ExecuteAsync(new BrowserOperation(
+    EBrowserOperationType.FillForm,
     Fields: [
         new FormFieldValue(2, "user@test.example.com"),
         new FormFieldValue(3, "test-password")
     ]));
 
 // Click submit
-snapshot = await agent.ExecuteAsync(new BrowserAction(
-    EBrowserActionType.Click, ElementIndex: 4));
+snapshot = await browserSession.ExecuteAsync(new BrowserOperation(
+    EBrowserOperationType.Click, ElementIndex: 4));
 
 // snapshot.Url, snapshot.Content, snapshot.Elements are now the dashboard
 ```
 
-Actions: Navigate, Click, Fill, FillForm, Select, Submit, ScrollDown, ScrollUp,
+Operations: Navigate, Click, Fill, FillForm, Select, Submit, ScrollDown, ScrollUp,
 WaitFor, Back, Snapshot. See the
-[browser agent docs](https://alexnek.github.io/WebTools.NET/browser-agent/overview/)
+[browser-session docs](https://alexnek.github.io/WebTools.NET/browser-session/overview/)
 for the full vocabulary.
 
 ### Detect the caller's region
@@ -192,9 +204,43 @@ for the full vocabulary.
 ```csharp
 using WebTools.NET.Geo;
 
-using var geo = new GeoRegionAgent();
+using var geo = new GeoRegionService();
 var region = await geo.DetectRegionAsync();   // e.g. "DE" - Geo-IP with locale fallback, cached
 ```
+
+## Backward Compatibility and Migration
+
+The session-oriented names are the preferred API, but the previous public names
+remain available during the compatibility period and are marked `[Obsolete]`.
+Existing applications can continue compiling while migrating incrementally:
+
+| Previous name | Preferred name |
+| --- | --- |
+| `BrowserAgent` | `BrowserSession` |
+| `IBrowserAgentInteraction` | `IBrowserSession` |
+| `IBrowserAgentSessionFactory` | `IBrowserSessionFactory` |
+| `BrowserAgentSessionFactory` | `BrowserSessionFactory` |
+| `BrowserAction` / `EBrowserActionType` | `BrowserOperation` / `EBrowserOperationType` |
+| `PageSnapshot` | `BrowserSnapshot` |
+| `BrowserAgentOptions` | `BrowserSessionOptions` |
+| `WebSearchAgent` | `WebSearchService` |
+| `WebNavigationAgent` | `WebNavigationService` |
+| `GeoRegionAgent` | `GeoRegionService` |
+
+The compatibility types forward to the current session/service implementations;
+new code should use the preferred names and follow the compiler migration
+messages. `BrowserAgent` converts legacy actions and snapshots to the current
+operation/session models. The old `AddBrowserServices` overloads accepting
+`BrowserAgentOptions`, and the old DI contracts, coexist with the
+`BrowserSessionOptions` and session contracts. They resolve the same current
+browser implementations and do not register a shared `BrowserSession`.
+
+The parameterless `WebSearchAgent` and `WebNavigationAgent` retain their
+historical behavior by creating and owning their default browser dependencies.
+This ownership behavior is limited to those obsolete wrappers; the preferred
+`WebSearchService` and `WebNavigationService` require caller-supplied
+dependencies and do not own them. Injected legacy wrappers also leave supplied
+dependencies caller-owned.
 
 ## Choosing a Browser Engine
 
@@ -219,8 +265,7 @@ sites detect and block headless browsers.
   implementation) without touching calling code.
 - **Result objects, not exceptions** — every operation reports success,
   error message, and payload in one record.
-- **DI-first, but constructor-friendly** — agents can also be created directly
-  and manage their own browser lifetime.
+- **DI-first, but constructor-friendly** — create a browser session from the factory (or directly), pass it to `BrowserSession`, and manage both lifetimes explicitly.
 - **Fully async with `CancellationToken` support** throughout.
 
 ## Demo Project

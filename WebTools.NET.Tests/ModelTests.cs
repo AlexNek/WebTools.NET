@@ -14,8 +14,8 @@ public class ModelTests
         // Arrange
         var items = new List<SearchResultItem>
         {
-            new("Title 1", "https://example.com", "Snippet 1"),
-            new("Title 2", "https://test.com", "Snippet 2")
+            new("Title 1", "https://test.example.com", "Snippet 1"),
+            new("Title 2", "https://other.test.example.com", "Snippet 2")
         };
 
         // Act
@@ -48,12 +48,12 @@ public class ModelTests
             HttpStatus: 200,
             ErrorMessage: null,
             RedirectCount: 3,
-            FinalUrl: "https://example.com/final");
+            FinalUrl: "https://test.example.com/final");
 
         // Assert
         result.Reachable.Should().BeTrue();
         result.RedirectCount.Should().Be(3);
-        result.FinalUrl.Should().Be("https://example.com/final");
+        result.FinalUrl.Should().Be("https://test.example.com/final");
         result.ProtectionType.Should().BeNull();
     }
 
@@ -76,20 +76,20 @@ public class ModelTests
     public void WebContent_WhenSuccessful_HasContent()
     {
         // Arrange & Act
-        var content = new WebContent(true, "Hello World", null, "https://example.com");
+        var content = new WebContent(true, "Hello World", null, "https://test.example.com");
 
         // Assert
         content.Success.Should().BeTrue();
         content.Content.Should().Be("Hello World");
         content.ErrorMessage.Should().BeNull();
-        content.FinalUrl.Should().Be("https://example.com");
+        content.FinalUrl.Should().Be("https://test.example.com");
     }
 
     [Fact]
     public void WebContent_WhenFailed_HasError()
     {
         // Arrange & Act
-        var content = new WebContent(false, "", "HTTP 500", "https://example.com/error");
+        var content = new WebContent(false, "", "HTTP 500", "https://test.example.com/error");
 
         // Assert
         content.Success.Should().BeFalse();
@@ -101,8 +101,8 @@ public class ModelTests
     public void SearchResultItem_RecordEquality_WorksCorrectly()
     {
         // Arrange
-        var item1 = new SearchResultItem("Title", "https://example.com", "Snippet");
-        var item2 = new SearchResultItem("Title", "https://example.com", "Snippet");
+        var item1 = new SearchResultItem("Title", "https://test.example.com", "Snippet");
+        var item2 = new SearchResultItem("Title", "https://test.example.com", "Snippet");
 
         // Act & Assert
         item1.Should().Be(item2);

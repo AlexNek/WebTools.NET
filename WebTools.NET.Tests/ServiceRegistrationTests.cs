@@ -3,6 +3,8 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
 using WebTools.NET.Abstractions;
+using WebTools.NET.Browsing;
+using WebTools.NET.Models;
 
 using Xunit;
 
@@ -43,35 +45,137 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
-    public void AddBrowserServices_WithPlaywright_RegistersAllServices()
+    public async Task AddBrowserServices_WithPlaywright_RegistersLegacyServicesAndSessionFactory()
     {
         // Arrange
         var services = new ServiceCollection();
 
         // Act
         services.AddBrowserServices(EBrowserEngine.Playwright);
-        var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<IBrowserSessionFactory>();
+        var legacyFactory = provider.GetRequiredService<IBrowserAgentSessionFactory>();
+        var interaction = provider.GetRequiredService<IBrowserInteraction>();
+        var legacyInteraction = provider.GetRequiredService<IBrowserAgentInteraction>();
+        var session = factory.Create();
+        var legacySession = legacyFactory.Create();
 
         // Assert
         provider.GetService<IWebContentFetcher>().Should().NotBeNull();
         provider.GetService<IWebSearchProvider>().Should().NotBeNull();
-        provider.GetService<IBrowserInteraction>().Should().NotBeNull();
+        legacyFactory.Should().BeSameAs(factory);
+        legacyInteraction.Should().BeSameAs(interaction);
+        provider.GetService<IBrowserSession>().Should().BeNull();
+        provider.GetService<BrowserSession>().Should().BeNull();
+        session.Should().BeOfType<PlaywrightSession>();
+        legacySession.Should().BeOfType<PlaywrightSession>();
+
+        await session.DisposeAsync();
+        await legacySession.DisposeAsync();
     }
 
     [Fact]
-    public void AddBrowserServices_WithCloakBrowser_RegistersAllServices()
+    public async Task AddBrowserServices_WithCloakBrowser_RegistersLegacyServicesAndSessionFactory()
     {
         // Arrange
         var services = new ServiceCollection();
 
         // Act
         services.AddBrowserServices(EBrowserEngine.CloakBrowser);
-        var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<IBrowserSessionFactory>();
+        var legacyFactory = provider.GetRequiredService<IBrowserAgentSessionFactory>();
+        var interaction = provider.GetRequiredService<IBrowserInteraction>();
+        var legacyInteraction = provider.GetRequiredService<IBrowserAgentInteraction>();
+        var session = factory.Create();
+        var legacySession = legacyFactory.Create();
 
         // Assert
         provider.GetService<IWebContentFetcher>().Should().NotBeNull();
         provider.GetService<IWebSearchProvider>().Should().NotBeNull();
-        provider.GetService<IBrowserInteraction>().Should().NotBeNull();
+        legacyFactory.Should().BeSameAs(factory);
+        legacyInteraction.Should().BeSameAs(interaction);
+        provider.GetService<IBrowserSession>().Should().BeNull();
+        provider.GetService<BrowserSession>().Should().BeNull();
+        session.Should().BeOfType<CloakBrowserSession>();
+        legacySession.Should().BeOfType<CloakBrowserSession>();
+
+        await session.DisposeAsync();
+        await legacySession.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task SessionFactory_CreatesIndependentSessionForEachCall()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddBrowserServices(EBrowserEngine.Playwright);
+        await using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<IBrowserSessionFactory>();
+
+        // Act
+        var first = factory.Create();
+        var second = factory.Create();
+
+        // Assert
+        first.Should().NotBeSameAs(second);
+        await first.DisposeAsync();
+        await second.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task AddBrowserServices_AppliesBrowserSessionOptionsToFactorySessions()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddBrowserServices(
+            EBrowserEngine.Playwright,
+            browserSessionOptions: new BrowserSessionOptions { ViewportHeight = 720 });
+        await using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<IBrowserSessionFactory>();
+        var session = factory.Create();
+
+        // Act
+        var height = await session.GetViewportHeightAsync();
+
+        // Assert
+        height.Should().Be(720);
+        await session.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task AddBrowserServices_LegacyOptionsOverload_MapsNestedSessionOptions()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddBrowserServices(new BrowserAgentOptions
+        {
+            SessionOptions = new BrowserSessionOptions { ViewportHeight = 720 }
+        });
+        await using var provider = services.BuildServiceProvider();
+        var session = provider.GetRequiredService<IBrowserAgentSessionFactory>().Create();
+        var height = await session.GetViewportHeightAsync();
+
+        // Assert
+        height.Should().Be(720);
+        await session.DisposeAsync();
+    }
+
+    [Fact]
+    public void AddBrowserServices_LegacyNullOptionsOverload_IsAccepted()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddBrowserServices(null);
+        using var provider = services.BuildServiceProvider();
+
+        // Assert
+        provider.GetService<IBrowserAgentSessionFactory>().Should().NotBeNull();
+        provider.GetService<IBrowserSessionFactory>().Should().NotBeNull();
     }
 
     [Fact]

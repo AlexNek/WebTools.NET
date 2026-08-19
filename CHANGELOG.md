@@ -9,12 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `BrowserAgent` — stateful browser agent that lets an LLM autonomously navigate, interact with, and extract information from web pages across multiple turns. Supports Navigate, Click, Fill, FillForm (compound multi-field), Select, Submit, ScrollDown/Up, WaitFor, Back, and Snapshot actions.
-- `PageSnapshot` model returned after every action with URL, title, content (formatted via `EContentFormat`), interactive elements list, status code, error, scroll hint, and optional screenshot
-- `BrowserAgentOptions` for configuring max actions, max duration, content format, screenshot opt-in, and cookie/auth persistence via Playwright storage state
-- `InteractiveElement` model representing clickable/fillable page elements with 1-based ephemeral indexing
-- `EBrowserActionType` enum and `BrowserAction`/`FormFieldValue` records for the action vocabulary
-- New `IBrowserInteraction` methods: `GetTitleAsync`, `GoBackAsync`, `ScrollAsync`, `SelectOptionAsync`, `SubmitFormAsync`, `WaitForSelectorAsync`, `ScreenshotAsync`, `SaveStorageStateAsync`, `LoadStorageStateAsync`
+- `BrowserSession` — caller-agnostic stateful browser-session capability for navigating, interacting with, and extracting information from pages across multiple turns. It receives an externally created `IBrowserSession`, never creates, disposes, or replaces it, and supports Navigate, Click, Fill, FillForm, Select, Submit, ScrollDown/Up, WaitFor, Back, and Snapshot operations with ephemeral DOM element indexes, viewport-aware scrolling, serialized operations, cached terminal snapshots, lifecycle-aware deadline recovery, coordinated persistence, configurable session limits, and explicit per-workflow composition.
+- `BrowserSnapshot` model returned after startup and each operation with URL, title, formatted content, interactive elements, HTTP status/error information, scroll hint, and optional screenshot.
+- `BrowserSessionOptions` for configuring maximum operations, maximum duration within supported timer bounds, content format, screenshot opt-in, Playwright storage-state persistence, and session viewport settings.
+- `IBrowserSessionFactory` and `BrowserSessionFactory` for creating a fresh externally owned browser session per independent workflow.
+- **Interactive extraction** — browser-session state includes visible, enabled interactive elements including fragment links, with deterministic, escaped selectors.
+- `InteractiveElement` model representing visible clickable/fillable page elements with deterministic 1-based indexing and executable selectors.
+- `EBrowserOperationType` enum and `BrowserOperation`/`FormFieldValue` records for the structured operation vocabulary.
+- `IBrowserSession` for composite browser-session capabilities, with smaller capability interfaces for element extraction, history, forms, status, storage, screenshots, viewport, and waiting; the existing `IBrowserInteraction` contract remains focused on direct navigation, clicking, and filling.
+- `WebSearchService`, `WebNavigationService`, and `GeoRegionService` naming for caller-agnostic web services; these types do not represent decision-making agents.
+
+### Changed
+
+- Introduced caller-agnostic browser sessions and services:
+  `BrowserSession`, `IBrowserSession`, `BrowserOperation`, `BrowserSnapshot`,
+  `BrowserSessionOptions`, `WebSearchService`, `WebNavigationService`, and
+  `GeoRegionService`.
+  Retained obsolete forwarding shims and legacy `AddBrowserServices` overloads so
+  existing applications can migrate without an immediate source-breaking
+  upgrade. New browser sessions use explicit external ownership.
+
+### Deprecated
+
+The following obsolete names are retained for migration:
+
+| Deprecated API | Replacement |
+| --- | --- |
+| `BrowserAgent` | `BrowserSession` |
+| `IBrowserAgentInteraction` | `IBrowserSession` |
+| `IBrowserAgentSessionFactory` | `IBrowserSessionFactory` |
+| `BrowserAction` | `BrowserOperation` |
+| `EBrowserActionType` | `EBrowserOperationType` |
+| `PageSnapshot` | `BrowserSnapshot` |
+| `BrowserAgentOptions` | `BrowserSessionOptions` |
+| `BrowserAgentSessionFactory` | `BrowserSessionFactory` |
+| `WebSearchAgent` | `WebSearchService` |
+| `WebNavigationAgent` | `WebNavigationService` |
+| `GeoRegionAgent` | `GeoRegionService` |
+
+### Fixed
+
+- Browser-session navigation and operation handling preserve observed status and current page state across partial snapshot failures and deadline recovery, enforce the session deadline across startup, operation dispatch, and in-flight snapshot work, serialize browser operations, lifecycle reset, and disposal through a shared gate so page/context cleanup cannot race an in-flight call, preserve cancellation and consistent not-started state for canceled or failed initialization, use a shared configured viewport for scrolling, validate compound form fields before mutation, and degrade optional screenshot failures without discarding successful page state.
+- Interactive-element extraction excludes hidden, disabled, readonly, and disabled-fieldset controls, preserves traversal order, produces escaped deterministic selectors, and verifies that the final selector resolves uniquely through Playwright.
+- Browser content fetching shares lifecycle and response handling across Playwright and CloakBrowser, shares navigation/retry logic between reachability and content fetches, detects challenge pages independently of HTTP status, preserves cancellation until underlying browser operations settle, waits for active operations before disposal, classifies redirected error pages consistently, and cleans up partial resources.
+- Web navigation validates link limits, preserves cancellation, handles malformed browser URLs safely, and resolves relative links against the final redirected page URL.
 
 ## [1.2.0] - 2026-08-18
 
@@ -53,3 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests with xUnit, FluentAssertions, and NSubstitute
 - Developer manual published as a documentation site via MkDocs Material and GitHub Pages
 
+[Unreleased]: https://github.com/AlexNek/WebTools.NET/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.2.0
+[1.1.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.1.0
+[1.0.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.0.0
