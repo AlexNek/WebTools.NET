@@ -1,5 +1,3 @@
-# Dependency Injection
-
 WebTools.NET ships two extension methods on `IServiceCollection` (namespace
 `Microsoft.Extensions.DependencyInjection`).
 
@@ -19,12 +17,20 @@ No browser is required for this registration.
 
 ## AddBrowserServices
 
-Registers the browser-backed services for the selected engine:
+Registers browser-backed services for the selected engine:
 
 ```csharp
 using WebTools.NET.Abstractions;
+using WebTools.NET.Models;
 
-services.AddBrowserServices(EBrowserEngine.Playwright, headless: true);
+services.AddBrowserServices(
+    EBrowserEngine.Playwright,
+    headless: true,
+    browserSessionOptions: new BrowserSessionOptions
+    {
+        MaxOperations = 100,
+        ViewportHeight = 720
+    });
 ```
 
 | Registered service | Playwright implementation | CloakBrowser implementation |
@@ -32,46 +38,78 @@ services.AddBrowserServices(EBrowserEngine.Playwright, headless: true);
 | `IWebContentFetcher` | `PlaywrightContentFetcher` | `CloakBrowserContentFetcher` |
 | `IWebSearchProvider` | `PlaywrightSearchProvider` | `CloakBrowserSearchProvider` |
 | `IBrowserInteraction` | `PlaywrightSession` | `CloakBrowserSession` |
+| `IBrowserSessionFactory` | `BrowserSessionFactory` | `BrowserSessionFactory` |
 
 ### Parameters
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `engine` | `EBrowserEngine.Playwright` | Selects the browser engine (see [Browser Engines](../concepts/browser-engines.md)) |
-| `headless` | `true` | Runs the browser headlessly; set `false` to watch the session for debugging |
+| `engine` | `EBrowserEngine.Playwright` | Selects the browser engine |
+| `headless` | `true` | Runs the browser headlessly; set `false` for debugging |
+| `browserSessionOptions` | `null` | Optional operation limits, storage persistence, screenshots, and viewport settings |
 
-## Typical Composition
+`BrowserSession` is not registered directly because it requires an explicitly
+created external browser session. Resolve `IBrowserSessionFactory` and create
+one fresh browser session for each independent workflow:
 
 ```csharp
-using Microsoft.Extensions.DependencyInjection;
-using WebTools.NET.Abstractions;
-
-var services = new ServiceCollection();
-
-services.AddLogging();
-services.AddWebToolsCore();
-services.AddBrowserServices(EBrowserEngine.Playwright);
-
-var provider = services.BuildServiceProvider();
+var factory = provider.GetRequiredService<IBrowserSessionFactory>();
+await using var browser = factory.Create();
+await using var session = new BrowserSession(browser);
 ```
 
-## Manual Construction Without DI
+`BrowserSession` is non-owning. The caller owns and disposes the supplied
+browser session. Declaring the browser before the wrapper ensures the wrapper
+is disposed first.
 
-All agents also support direct construction, which is useful in scripts and
-tests. A parameterless constructor creates and owns a default Playwright-based
-dependency; passing an explicit dependency makes you responsible for its
-lifetime:
+### Migrating existing registrations
+
+The former registration shape remains available as an obsolete overload, so an
+existing application can migrate independently of the rest of its code:
+
+```csharp
+services.AddBrowserServices(new BrowserAgentOptions
+{
+    MaxActions = 50,
+    SessionOptions = new BrowserSessionOptions { ViewportHeight = 720 }
+});
+
+var legacyFactory = provider.GetRequiredService<IBrowserAgentSessionFactory>();
+```
+
+`IBrowserAgentSessionFactory` resolves the same current factory as the
+preferred `IBrowserSessionFactory`. `IBrowserSession` is not registered
+directly; call `IBrowserSessionFactory.Create()` to obtain a fresh session for
+each workflow, then pass it to the non-owning `BrowserSession` wrapper.
+`IBrowserAgentInteraction` resolves to the selected low-level registered
+implementation, `PlaywrightSession` or `CloakBrowserSession`, rather than to the
+`BrowserSession` wrapper. New code should use `BrowserSessionOptions` and the
+preferred session contracts directly.
+
+## Manual construction without DI
+
+Create the concrete browser session explicitly when DI is not used:
+
+```csharp
+using WebTools.NET;
+using WebTools.NET.Browsing;
+using WebTools.NET.Models;
+
+await using var browser = new PlaywrightSession(
+    options: new BrowserSessionOptions { ViewportHeight = 720 });
+await using var session = new BrowserSession(browser);
+var snapshot = await session.StartAsync("https://test.example.com");
+```
+
+Other services also accept externally supplied providers or clients:
 
 ```csharp
 using WebTools.NET;
 using WebTools.NET.Search;
 
-// Owns its PlaywrightSearchProvider internally
-await using var agent1 = new WebSearchAgent();
-
-// You own the provider's lifetime
 using var ddg = new DuckDuckGoSearchProvider();
-await using var agent2 = new WebSearchAgent(ddg);
+var search = new WebSearchService(ddg);
+var result = await search.SearchAsync("dotnet web scraping");
 ```
 
 !!! note

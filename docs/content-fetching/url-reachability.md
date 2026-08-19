@@ -48,7 +48,7 @@ var check = await fetcher.CheckReachabilityAsync("https://test.example.com");
 ```
 
 Useful for validating links discovered by the
-[WebNavigationAgent](../navigation/web-navigation-agent.md), which performs
+[WebNavigationService](../navigation/web-navigation-service.md), which performs
 exactly this kind of check internally.
 
 ## The UrlCheckResult Model

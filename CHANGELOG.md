@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-20
+
+### Added
+
+- `BrowserSession` — caller-agnostic stateful browser-session capability for navigating, interacting with, and extracting information from pages across multiple turns. It receives an externally created `IBrowserSession`, never creates, disposes, or replaces it, and supports Navigate, Click, Fill, FillForm, Select, Submit, ScrollDown/Up, WaitFor, Back, and Snapshot operations with ephemeral DOM element indexes, viewport-aware scrolling, serialized operations, cached terminal snapshots, lifecycle-aware deadline recovery, coordinated persistence, configurable session limits, and explicit per-workflow composition.
+- `BrowserSnapshot` model returned after startup and each operation with URL, title, formatted content, interactive elements, HTTP status/error information, scroll hint, and optional screenshot.
+- `BrowserSessionOptions` for configuring maximum operations, maximum duration within supported timer bounds, content format, screenshot opt-in, Playwright storage-state persistence, and session viewport settings.
+- `IBrowserSessionFactory` and `BrowserSessionFactory` for creating a fresh externally owned browser session per independent workflow.
+- **Interactive extraction** — browser-session state includes visible, enabled interactive elements including fragment links, with deterministic, escaped selectors.
+- `InteractiveElement` model representing visible clickable/fillable page elements with deterministic 1-based indexing and executable selectors.
+- `EBrowserOperationType` enum and `BrowserOperation`/`FormFieldValue` records for the structured operation vocabulary.
+- `IBrowserSession` for composite browser-session capabilities, with smaller capability interfaces for element extraction, history, forms, status, storage, screenshots, viewport, and waiting; the existing `IBrowserInteraction` contract remains focused on direct navigation, clicking, and filling.
+- `WebSearchService`, `WebNavigationService`, and `GeoRegionService` naming for caller-agnostic web services; these types do not represent decision-making agents.
+
+### Changed
+
+- Introduced caller-agnostic browser sessions and services:
+  `BrowserSession`, `IBrowserSession`, `BrowserOperation`, `BrowserSnapshot`,
+  `BrowserSessionOptions`, `WebSearchService`, `WebNavigationService`, and
+  `GeoRegionService`.
+  Retained obsolete forwarding shims and legacy `AddBrowserServices` overloads so
+  existing applications can migrate without an immediate source-breaking
+  upgrade. Legacy `BrowserAgentOptions` conversion honors nested
+  `SessionOptions` with nested values taking precedence over top-level legacy
+  properties. New browser sessions use explicit external ownership.
+
+- Updated the README, API reference, DI getting-started guide, and browser-session refactor documents to explain the caller-agnostic architecture, external session ownership, old/new DI contracts, obsolete API mappings, and incremental migration. Documentation examples use the preferred session/service names while compatibility behavior remains documented.
+
+### Deprecated
+
+The following obsolete names are retained for migration:
+
+| Deprecated API | Replacement |
+| --- | --- |
+| `BrowserAgent` | `BrowserSession` |
+| `IBrowserAgentInteraction` | `IBrowserSession` |
+| `IBrowserAgentSessionFactory` | `IBrowserSessionFactory` |
+| `BrowserAction` | `BrowserOperation` |
+| `EBrowserActionType` | `EBrowserOperationType` |
+| `PageSnapshot` | `BrowserSnapshot` |
+| `BrowserAgentOptions` | `BrowserSessionOptions` |
+| `BrowserAgentSessionFactory` | `BrowserSessionFactory` |
+| `WebSearchAgent` | `WebSearchService` |
+| `WebNavigationAgent` | `WebNavigationService` |
+| `GeoRegionAgent` | `GeoRegionService` |
+
+### Fixed
+
+- Browser-session navigation and operation handling preserve observed status and current page state across partial snapshot failures and deadline recovery, enforce the session deadline across startup, operation dispatch, and in-flight snapshot work, serialize browser operations, lifecycle reset, and disposal through a shared gate so page/context cleanup cannot race an in-flight call, bound cleanup lock waits, browser resets, recovery snapshots, and browser-resource disposal by the disposal timeout, preserve cancellation while retaining completed startup resources for disposal and consistent not-started state for canceled or failed initialization, use a shared configured viewport for scrolling, validate navigation URLs before dispatch and compound form fields before mutation, and degrade optional screenshot failures without discarding successful page state.
+- Interactive-element extraction excludes hidden, disabled, readonly, and disabled-fieldset controls, preserves traversal order, produces escaped deterministic selectors, and verifies that the final selector resolves uniquely through Playwright.
+- Browser content fetching shares lifecycle and response handling across Playwright and CloakBrowser, shares navigation/retry logic between reachability and content fetches, detects challenge pages independently of HTTP status, preserves cancellation until underlying browser operations settle, disposes resources produced before cancellation discards them, waits for active operations before disposal, classifies redirected error pages consistently, and cleans up partial resources.
+- Web navigation validates link limits, preserves cancellation, handles malformed browser URLs safely, and resolves relative links against the final redirected page URL.
+
 ## [1.2.0] - 2026-08-18
 
 ### Added
@@ -44,3 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests with xUnit, FluentAssertions, and NSubstitute
 - Developer manual published as a documentation site via MkDocs Material and GitHub Pages
 
+[Unreleased]: https://github.com/AlexNek/WebTools.NET/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.2.0
+[1.1.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.1.0
+[1.0.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.0.0

@@ -24,7 +24,8 @@ Throws `ArgumentNullException` when `services` is null.
 public static IServiceCollection AddBrowserServices(
     this IServiceCollection services,
     EBrowserEngine engine = EBrowserEngine.Playwright,
-    bool headless = true)
+    bool headless = true,
+    BrowserSessionOptions? browserSessionOptions = null)
 ```
 
 Registers the browser-backed services for the selected engine:
@@ -34,11 +35,52 @@ Registers the browser-backed services for the selected engine:
 | `IWebContentFetcher` | `PlaywrightContentFetcher` | `CloakBrowserContentFetcher` | Singleton |
 | `IWebSearchProvider` | `PlaywrightSearchProvider` | `CloakBrowserSearchProvider` | Singleton |
 | `IBrowserInteraction` | `PlaywrightSession` | `CloakBrowserSession` | Singleton |
+| `IBrowserSessionFactory` | `BrowserSessionFactory` | `BrowserSessionFactory` | Singleton |
 
-Browser-based search providers receive an `ILogger<T>` from the container when
-logging is registered; otherwise they run without logging.
+`BrowserSession` is intentionally not registered directly because it requires
+an explicitly supplied external browser session. Resolve
+`IBrowserSessionFactory`, create one fresh session per workflow, pass that
+session to `BrowserSession`, and dispose both explicitly.
+`browserSessionOptions` is forwarded to factory-created
+`PlaywrightSession` or `CloakBrowserSession` instances, including their viewport
+settings. DI registration alone does not configure a separately constructed
+`BrowserSession` wrapper or apply its limits such as `MaxOperations` and
+`MaxDuration`; pass the same options object to the `BrowserSession` constructor.
+
+For existing applications, obsolete overloads accepting `BrowserAgentOptions`
+remain available. The legacy `IBrowserAgentSessionFactory` and
+`IBrowserAgentInteraction` registrations are aliases for the same current
+factory/session instances; they do not register `BrowserAgent` or a shared
+`BrowserSession`. Migrate the options object and contracts at your own pace:
+
+```csharp
+services.AddBrowserServices(new BrowserAgentOptions
+{
+    SessionOptions = new BrowserSessionOptions { ViewportHeight = 720 }
+});
+var legacyFactory = provider.GetRequiredService<IBrowserAgentSessionFactory>();
+```
+
+Use `BrowserSessionOptions`, `IBrowserSessionFactory`, and `IBrowserSession` in
+new code. The old `BrowserAgent`, action/model, and service wrapper names are
+also retained as obsolete forwarding types; see the migration section in the
+README.
 
 Throws `ArgumentNullException` when `services` is null.
+
+The legacy options overload is retained for existing applications:
+
+```csharp
+services.AddBrowserServices(new BrowserAgentOptions
+{
+    SessionOptions = new BrowserSessionOptions { ViewportHeight = 720 }
+});
+```
+
+It forwards to the current `BrowserSessionOptions` registration. The obsolete
+`IBrowserAgentSessionFactory` and `IBrowserAgentInteraction` contracts resolve
+the same current factory and browser-session implementations as the preferred
+session contracts. New code should use `BrowserSessionOptions` directly.
 
 ## Overriding Registrations
 
@@ -54,16 +96,32 @@ services.AddBrowserServices();   // IWebSearchProvider stays MySearchProvider
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
+using WebTools.NET;
 using WebTools.NET.Abstractions;
+using WebTools.NET.Models;
 
 var services = new ServiceCollection();
+var options = new BrowserSessionOptions
+{
+    MaxOperations = 20,
+    MaxDuration = TimeSpan.FromMinutes(2),
+    ViewportWidth = 1280,
+    ViewportHeight = 720
+};
 
 services.AddLogging();
 services.AddWebToolsCore();
-services.AddBrowserServices(EBrowserEngine.Playwright, headless: true);
+services.AddBrowserServices(
+    EBrowserEngine.Playwright,
+    headless: true,
+    browserSessionOptions: options);
 
 await using var provider = services.BuildServiceProvider();
 
 var webAccess = provider.GetRequiredService<IWebAccessService>();
 var fetcher = provider.GetRequiredService<IWebContentFetcher>();
+var sessionFactory = provider.GetRequiredService<IBrowserSessionFactory>();
+await using var browser = sessionFactory.Create();
+await using var session = new BrowserSession(browser, options);
+var snapshot = await session.StartAsync("https://test.example.com");
 ```

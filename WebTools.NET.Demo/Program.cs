@@ -48,20 +48,20 @@ await runner.RunSectionAsync(
 // ---------------------------------------------------------------------
 // 2. Geo region detection
 // ---------------------------------------------------------------------
-using var geoAgent = new GeoRegionAgent();
+using var geoService = new GeoRegionService();
 
 await runner.RunSectionAsync(
-    "Geo region detection (GeoRegionAgent)",
+    "Geo region detection (GeoRegionService)",
     "Geo-IP lookup via ip-api.com with system-locale fallback. Result is cached.",
     async () =>
     {
         var watch = Stopwatch.StartNew();
-        var region = await geoAgent.DetectRegionAsync();
+        var region = await geoService.DetectRegionAsync();
         watch.Stop();
         ConsoleOutput.Ok($"detected region \"{region}\" ({watch.ElapsedMilliseconds} ms - Geo-IP lookup)");
 
         watch.Restart();
-        var cached = await geoAgent.DetectRegionAsync();
+        var cached = await geoService.DetectRegionAsync();
         watch.Stop();
         ConsoleOutput.Ok($"detected region \"{cached}\" ({watch.ElapsedMilliseconds} ms - served from cache)");
     });
@@ -130,16 +130,16 @@ await runner.RunSectionAsync(
     () => SearchDemoAsync(search.SearchAsync, SearchQuery));
 
 // ---------------------------------------------------------------------
-// 8. WebSearchAgent - automatic fallback queries
+// 8. WebSearchService - automatic fallback queries
 // ---------------------------------------------------------------------
 await runner.RunSectionAsync(
-    "WebSearchAgent with automatic fallback queries",
+    "WebSearchService with automatic fallback queries",
     "Wraps any IWebSearchProvider; on empty results it retries with modified queries.",
     async () =>
     {
-        await using var agent = new WebSearchAgent(search);
+        var searchService = new WebSearchService(search);
         await SearchDemoAsync(
-            agent.SearchAsync,
+            searchService.SearchAsync,
             "Playwright .NET API",
             "PlaywrightSearchProvider (reuses the browser from section 7)");
     });
@@ -198,19 +198,19 @@ await runner.RunSectionAsync(
     });
 
 // ---------------------------------------------------------------------
-// 11. Web navigation agent
+// 11. Web navigation searchService
 // ---------------------------------------------------------------------
 await runner.RunSectionAsync(
-    "WebNavigationAgent - link extraction and validation",
+    "WebNavigationService - link extraction and validation",
     "Extracts same-host links from a page and verifies each one in the browser.",
     async () =>
     {
-        await using var navAgent = new WebNavigationAgent(browser);
+        var navService = new WebNavigationService(browser);
         const string startUrl = "https://en.wikipedia.org/wiki/.NET";
         ConsoleOutput.Info("start url", startUrl);
         ConsoleOutput.Info("limit", "first 5 same-host links");
 
-        var working = await navAgent.NavigateAsync(startUrl, maxLinks: 5);
+        var working = await navService.NavigateAsync(startUrl, maxLinks: 5);
         if (working.Count == 0)
         {
             ConsoleOutput.Fail("no working links found");

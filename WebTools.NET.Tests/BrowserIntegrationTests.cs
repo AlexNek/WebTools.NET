@@ -8,21 +8,24 @@ using Xunit;
 namespace WebTools.NET.Tests;
 
 /// <summary>
-/// Live-network integration tests. These hit the real internet and require
-/// installed Playwright browsers; CI excludes them via the Category=Integration
-/// trait filter. Unit tests must stay hermetic — do not remove the trait.
+/// Playwright integration tests requiring installed browsers. The search-provider test
+/// uses the live network; the content-fetcher test uses a local test server. CI excludes
+/// these tests via the Category=Integration trait filter. Unit tests must stay hermetic —
+/// do not remove the trait.
 /// </summary>
 [Trait("Category", "Integration")]
 public class BrowserIntegrationTests
 {
     [Fact]
-    public async Task PlaywrightContentFetcher_FetchesRealPage()
+    public async Task PlaywrightContentFetcher_FetchesLocalPage()
     {
         // Arrange
+        await using var server = await TestHttpServer.StartAsync(
+            "<html><body><h1>Test page</h1></body></html>");
         await using var fetcher = new PlaywrightContentFetcher();
 
         // Act
-        var result = await fetcher.FetchAsync("https://example.com");
+        var result = await fetcher.FetchAsync(server.Url);
 
         // Assert
         result.Success.Should().BeTrue();

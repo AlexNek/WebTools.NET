@@ -1,8 +1,7 @@
 # Browser Engines
 
-All browser-backed features in WebTools.NET go through a single abstraction,
-`IBrowserInteraction`, with two engine choices selected via the
-`EBrowserEngine` enum.
+All browser-backed features in WebTools.NET go through a small set of
+capabilities, with two engine choices selected via the `EBrowserEngine` enum.
 
 ## Engine Options
 
@@ -22,8 +21,9 @@ services.AddBrowserServices(EBrowserEngine.CloakBrowser, headless: true);
 ```
 
 The chosen engine determines the implementations of `IWebContentFetcher`,
-`IWebSearchProvider`, and `IBrowserInteraction` (see
-[Dependency Injection](../getting-started/dependency-injection.md)).
+`IWebSearchProvider`, and the low-level `IBrowserInteraction` service. Resolve
+`IBrowserSessionFactory` and call `Create()` once per independent workflow when
+using `BrowserSession`.
 
 ## What CloakBrowser Adds
 
@@ -52,10 +52,12 @@ Both sessions use fixed internal timeouts tuned for automation scenarios:
 | Network idle wait after actions | 10 s |
 | Reachability check | 10 s |
 
-## Sessions Are Lazy and Reused
+## Sessions Are Lazy and Explicitly Owned
 
 Browser sessions are created lazily on first use and reused for subsequent
-calls on the same instance. Since DI registers them as singletons, a single
-browser instance serves the whole application. Dispose sessions via
-`IAsyncDisposable` (automatic when the DI container is disposed) to release
-the browser process.
+calls on the same instance. The low-level `IBrowserInteraction` registration
+remains a singleton for compatibility, but it is not a browser-session factory.
+`IBrowserSessionFactory` is stateless and returns a fresh session on every
+`Create()` call. Pass that session to `BrowserSession`, and dispose the supplied
+session explicitly after the wrapper; use a separate factory-created session for
+each concurrent or unrelated workflow.

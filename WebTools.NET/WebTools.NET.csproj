@@ -7,9 +7,9 @@
     <!-- NuGet metadata -->
     <PackageId>WebTools.NET</PackageId>
     <Title>WebTools.NET</Title>
-    <Description>Web tools for .NET agents: web search, browser-based content fetching, and navigation.</Description>
+    <Description>Web tools for .NET applications: web search, browser-based content fetching, and navigation.</Description>
     <Authors>Alex Nek</Authors>
-    <PackageTags>web;search;browser;playwright;agent;tools;dotnet</PackageTags>
+    <PackageTags>web;search;browser;playwright;tools;dotnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>

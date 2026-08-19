@@ -4,8 +4,6 @@ namespace WebTools.NET.Internal;
 
 internal static class BrowserHelpers
 {
-    internal const string GoogleWarmupUrl = "https://www.google.com";
-
     internal const int WarmupDelayMs = 300;
 
     internal const int WarmupGotoTimeoutMs = 8000;
@@ -28,35 +26,49 @@ internal static class BrowserHelpers
     }
 
     /// <summary>
-    /// Warms up the page with a Google visit (helps clear cookie-based blocks),
-    /// then navigates to the target URL. Warmup failures are ignored.
+    /// Optionally warms up a page, then navigates to the target URL. Warm-up failures are ignored,
+    /// but cancellation is always propagated.
     /// </summary>
     internal static async Task<IResponse?> WarmupAndGotoAsync(
         IPage page,
         string url,
         int gotoTimeoutMs,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? warmupUrl = null)
     {
-        try
+        if (!string.IsNullOrWhiteSpace(warmupUrl))
         {
-            await page.GotoAsync(
-                GoogleWarmupUrl,
-                new PageGotoOptions
-                    {
-                        WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = WarmupGotoTimeoutMs
-                    });
-            await Task.Delay(WarmupDelayMs, ct);
-        }
-        catch
-        {
-            // warmup failed — proceed anyway
+            try
+            {
+                await page.GotoAsync(
+                        warmupUrl,
+                        new PageGotoOptions
+                        {
+                            WaitUntil = WaitUntilState.DOMContentLoaded,
+                            Timeout = WarmupGotoTimeoutMs
+                        })
+                    .AwaitWithCancellationAsync(ct)
+                    .ConfigureAwait(false);
+                await Task.Delay(WarmupDelayMs, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // Warm-up failed — proceed anyway.
+            }
         }
 
         return await page.GotoAsync(
-                   url,
-                   new PageGotoOptions
-                       {
-                           WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = gotoTimeoutMs
-                       });
+                url,
+                new PageGotoOptions
+                {
+                    WaitUntil = WaitUntilState.DOMContentLoaded,
+                    Timeout = gotoTimeoutMs
+                })
+            .AwaitWithCancellationAsync(ct)
+            .ConfigureAwait(false);
     }
 }

@@ -9,18 +9,18 @@ using Xunit;
 
 namespace WebTools.NET.Tests;
 
-public class WebSearchAgentTests
+public class WebSearchServiceTests
 {
     [Fact]
     public async Task SearchAsync_WhenProviderReturnsResults_ReturnsThemDirectly()
     {
         // Arrange
         var searchProvider = Substitute.For<IWebSearchProvider>();
-        var expected = new SearchResult(true, [new SearchResultItem("Title", "https://example.com", "Snippet")], null);
+        var expected = new SearchResult(true, [new SearchResultItem("Title", "https://test.example.com", "Snippet")], null);
         searchProvider.SearchAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(expected);
 
-        var sut = new WebSearchAgent(searchProvider);
+        var sut = new WebSearchService(searchProvider);
 
         // Act
         var result = await sut.SearchAsync("test query");
@@ -36,12 +36,12 @@ public class WebSearchAgentTests
         // Arrange
         var searchProvider = Substitute.For<IWebSearchProvider>();
         var emptyResult = new SearchResult(true, [], null);
-        var fallbackResult = new SearchResult(true, [new SearchResultItem("Fallback", "https://example.com", "Found")], null);
+        var fallbackResult = new SearchResult(true, [new SearchResultItem("Fallback", "https://test.example.com", "Found")], null);
 
         searchProvider.SearchAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(emptyResult, fallbackResult);
 
-        var sut = new WebSearchAgent(searchProvider);
+        var sut = new WebSearchService(searchProvider);
 
         // Act
         var result = await sut.SearchAsync("dotnet");
@@ -58,12 +58,12 @@ public class WebSearchAgentTests
         // Arrange
         var searchProvider = Substitute.For<IWebSearchProvider>();
         var emptyResult = new SearchResult(true, [], null);
-        var found = new SearchResult(true, [new SearchResultItem("Found", "https://example.com", "")], null);
+        var found = new SearchResult(true, [new SearchResultItem("Found", "https://test.example.com", "")], null);
 
         searchProvider.SearchAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(emptyResult, emptyResult, found);
 
-        var sut = new WebSearchAgent(searchProvider);
+        var sut = new WebSearchService(searchProvider);
 
         // Act
         var result = await sut.SearchAsync("Playwright API");
@@ -83,7 +83,7 @@ public class WebSearchAgentTests
         searchProvider.SearchAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(expected);
 
-        var sut = new WebSearchAgent(searchProvider);
+        var sut = new WebSearchService(searchProvider);
 
         // Act
         await sut.SearchAsync("query", maxResults: 7);
@@ -101,7 +101,7 @@ public class WebSearchAgentTests
         searchProvider.SearchAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(emptyResult);
 
-        var sut = new WebSearchAgent(searchProvider);
+        var sut = new WebSearchService(searchProvider);
 
         // Act
         await sut.SearchAsync("Playwright .NET API");
