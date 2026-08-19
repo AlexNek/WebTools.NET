@@ -48,13 +48,19 @@ public sealed class BrowserAgent : IAsyncDisposable
     private static BrowserSessionOptions ToSessionOptions(BrowserAgentOptions? options)
     {
         options ??= new BrowserAgentOptions();
+        var nested = options.SessionOptions;
+
+        // SessionOptions is the canonical configuration when supplied; otherwise,
+        // preserve the legacy top-level BrowserAgentOptions values.
         return new BrowserSessionOptions
         {
-            MaxOperations = options.MaxActions,
-            MaxDuration = options.MaxDuration,
-            DefaultFormat = options.DefaultFormat,
-            IncludeScreenshot = options.IncludeScreenshot,
-            StorageStatePath = options.StorageStatePath
+            MaxOperations = nested?.MaxOperations ?? options.MaxActions,
+            MaxDuration = nested?.MaxDuration ?? options.MaxDuration,
+            DefaultFormat = nested?.DefaultFormat ?? options.DefaultFormat,
+            IncludeScreenshot = nested?.IncludeScreenshot ?? options.IncludeScreenshot,
+            StorageStatePath = nested?.StorageStatePath ?? options.StorageStatePath,
+            ViewportWidth = nested?.ViewportWidth ?? 1920,
+            ViewportHeight = nested?.ViewportHeight ?? 1080
         };
     }
 

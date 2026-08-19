@@ -146,10 +146,14 @@ public interface IBrowserSessionState
 
 ## BrowserSessionOptions
 
-`BrowserSessionOptions` configures session limits, content format, screenshots,
-storage persistence, and browser context viewport. The default viewport is
-1920×1080; pass it to `PlaywrightSession`, `CloakBrowserSession`, or
-`BrowserSession`.
+`BrowserSessionOptions` contains settings for both the engine session and the
+orchestration wrapper. `ViewportWidth` and `ViewportHeight` are engine-session
+options that must reach `PlaywrightSession` or `CloakBrowserSession` (directly or
+through `IBrowserSessionFactory`). `MaxOperations`, `MaxDuration`,
+`DefaultFormat`, and `IncludeScreenshot` are orchestration options consumed by
+`BrowserSession`; pass the options object when constructing that wrapper.
+`StorageStatePath` is used by both layers when storage persistence is enabled.
+The default viewport is 1920×1080.
 
 ## IGeoRegionProvider
 

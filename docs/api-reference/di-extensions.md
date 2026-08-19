@@ -41,8 +41,11 @@ Registers the browser-backed services for the selected engine:
 an explicitly supplied external browser session. Resolve
 `IBrowserSessionFactory`, create one fresh session per workflow, pass that
 session to `BrowserSession`, and dispose both explicitly.
-`browserSessionOptions` configures factory-created browser sessions and session
-limits.
+`browserSessionOptions` is forwarded to factory-created
+`PlaywrightSession` or `CloakBrowserSession` instances, including their viewport
+settings. DI registration alone does not configure a separately constructed
+`BrowserSession` wrapper or apply its limits such as `MaxOperations` and
+`MaxDuration`; pass the same options object to the `BrowserSession` constructor.
 
 For existing applications, obsolete overloads accepting `BrowserAgentOptions`
 remain available. The legacy `IBrowserAgentSessionFactory` and
@@ -95,12 +98,23 @@ services.AddBrowserServices();   // IWebSearchProvider stays MySearchProvider
 using Microsoft.Extensions.DependencyInjection;
 using WebTools.NET;
 using WebTools.NET.Abstractions;
+using WebTools.NET.Models;
 
 var services = new ServiceCollection();
+var options = new BrowserSessionOptions
+{
+    MaxOperations = 20,
+    MaxDuration = TimeSpan.FromMinutes(2),
+    ViewportWidth = 1280,
+    ViewportHeight = 720
+};
 
 services.AddLogging();
 services.AddWebToolsCore();
-services.AddBrowserServices(EBrowserEngine.Playwright, headless: true);
+services.AddBrowserServices(
+    EBrowserEngine.Playwright,
+    headless: true,
+    browserSessionOptions: options);
 
 await using var provider = services.BuildServiceProvider();
 
@@ -108,6 +122,6 @@ var webAccess = provider.GetRequiredService<IWebAccessService>();
 var fetcher = provider.GetRequiredService<IWebContentFetcher>();
 var sessionFactory = provider.GetRequiredService<IBrowserSessionFactory>();
 await using var browser = sessionFactory.Create();
-await using var session = new BrowserSession(browser);
+await using var session = new BrowserSession(browser, options);
 var snapshot = await session.StartAsync("https://test.example.com");
 ```

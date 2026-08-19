@@ -28,8 +28,8 @@ public sealed class CloakBrowserSession : BrowserSessionBase
     protected override async Task<(IBrowserContext Context, IPage Page)> CreatePageAsync(CancellationToken ct)
     {
         _handle ??= await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = _headless })
-            .AwaitWithCancellationAsync(ct)
             .ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
 
         var browser = _handle.RawBrowser;
         IBrowserContext? context = null;
@@ -56,7 +56,7 @@ public sealed class CloakBrowserSession : BrowserSessionBase
         {
             try
             {
-                await _handle.DisposeAsync().ConfigureAwait(false);
+                await _handle.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is ObjectDisposedException or TimeoutException or PlaywrightException)
             {

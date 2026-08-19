@@ -27,11 +27,12 @@ public sealed class PlaywrightSession : BrowserSessionBase
 
     protected override async Task<(IBrowserContext Context, IPage Page)> CreatePageAsync(CancellationToken ct)
     {
-        _playwright ??= await Playwright.CreateAsync().AwaitWithCancellationAsync(ct).ConfigureAwait(false);
+        _playwright ??= await Playwright.CreateAsync().ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
         _browser ??= await _playwright.Chromium
             .LaunchAsync(new BrowserTypeLaunchOptions { Headless = _headless })
-            .AwaitWithCancellationAsync(ct)
             .ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
 
         IBrowserContext? context = null;
         try

@@ -53,10 +53,18 @@ public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
         IBrowser? browser = null;
         try
         {
-            playwright = await Playwright.CreateAsync().AwaitWithCancellationAsync(ct).ConfigureAwait(false);
+            playwright = await Playwright.CreateAsync()
+                .AwaitWithCancellationAsync(
+                    ct,
+                    value =>
+                    {
+                        value.Dispose();
+                        return Task.CompletedTask;
+                    })
+                .ConfigureAwait(false);
             browser = await playwright.Chromium
                 .LaunchAsync(CreateLaunchOptions(_headless))
-                .AwaitWithCancellationAsync(ct)
+                .AwaitWithCancellationAsync(ct, value => CloseBrowserAsync(value))
                 .ConfigureAwait(false);
             var context = await browser.NewContextAsync(BrowserFetcherDefaults.CreateContextOptions())
                 .AwaitWithCancellationAsync(ct)

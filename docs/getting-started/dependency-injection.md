@@ -77,12 +77,14 @@ services.AddBrowserServices(new BrowserAgentOptions
 var legacyFactory = provider.GetRequiredService<IBrowserAgentSessionFactory>();
 ```
 
-`IBrowserAgentSessionFactory` and `IBrowserAgentInteraction` resolve the same
-current factory and browser-session implementations as their preferred
-`IBrowserSessionFactory` and `IBrowserSession` contracts. New code should use
-`BrowserSessionOptions` and the session contracts directly. `BrowserSession` is
-still not registered automatically; the caller owns each created browser
-session and passes it to the non-owning `BrowserSession` wrapper.
+`IBrowserAgentSessionFactory` resolves the same current factory as the
+preferred `IBrowserSessionFactory`. `IBrowserSession` is not registered
+directly; call `IBrowserSessionFactory.Create()` to obtain a fresh session for
+each workflow, then pass it to the non-owning `BrowserSession` wrapper.
+`IBrowserAgentInteraction` resolves to the selected low-level registered
+implementation, `PlaywrightSession` or `CloakBrowserSession`, rather than to the
+`BrowserSession` wrapper. New code should use `BrowserSessionOptions` and the
+preferred session contracts directly.
 
 ## Manual construction without DI
 

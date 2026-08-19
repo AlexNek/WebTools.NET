@@ -24,6 +24,8 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
 
     private const int WaitForSelectorDefaultMs = 5000;
 
+    private const int UnknownNavigationStatus = 0;
+
     internal const int DefaultViewportHeight = 1080;
 
     internal const int DefaultViewportWidth = 1920;
@@ -38,7 +40,7 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
 
     private int _disposed;
 
-    private int? _lastNavigationStatus;
+    private int _lastNavigationStatus = UnknownNavigationStatus;
 
     private IPage? _page;
 
@@ -69,7 +71,7 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
         await _operationLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            _lastNavigationStatus = null;
+            Volatile.Write(ref _lastNavigationStatus, UnknownNavigationStatus);
             var page = await GetPageAsync(ct).ConfigureAwait(false);
             var response = await page.GotoAsync(
                     url,
@@ -82,8 +84,8 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
                 .ConfigureAwait(false);
 
             ct.ThrowIfCancellationRequested();
-            var status = response?.Status ?? 0;
-            _lastNavigationStatus = response?.Status;
+            var status = response?.Status ?? UnknownNavigationStatus;
+            Volatile.Write(ref _lastNavigationStatus, response?.Status ?? UnknownNavigationStatus);
             if (HttpStatusHelper.IsNotSuccess(status))
             {
                 return false;
@@ -141,7 +143,7 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
             {
                 ThrowIfDisposed();
                 await ClosePageAndContextAsync().ConfigureAwait(false);
-                _lastNavigationStatus = null;
+                Volatile.Write(ref _lastNavigationStatus, UnknownNavigationStatus);
             }
             finally
             {
@@ -335,7 +337,8 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
         await _operationLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            return _lastNavigationStatus;
+            var status = Volatile.Read(ref _lastNavigationStatus);
+            return status == UnknownNavigationStatus ? null : status;
         }
         finally
         {
@@ -383,12 +386,15 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
         await _operationLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            _lastNavigationStatus = null;
+            Volatile.Write(ref _lastNavigationStatus, UnknownNavigationStatus);
             var page = await GetPageAsync(ct).ConfigureAwait(false);
             var response = await page.GoBackAsync(new PageGoBackOptions { Timeout = NavigateTimeoutMs })
                 .AwaitWithCancellationAsync(ct)
                 .ConfigureAwait(false);
-            _lastNavigationStatus = response?.Status ?? _lastNavigationStatus;
+            if (response?.Status is int status)
+            {
+                Volatile.Write(ref _lastNavigationStatus, status);
+            }
             ct.ThrowIfCancellationRequested();
             await WaitForNetworkIdleAsync(page, NetworkIdleTimeoutMs, ct).ConfigureAwait(false);
         }
@@ -469,7 +475,7 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
         await _operationLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            _lastNavigationStatus = null;
+            Volatile.Write(ref _lastNavigationStatus, UnknownNavigationStatus);
             var page = await GetPageAsync(ct).ConfigureAwait(false);
             var response = await page.GotoAsync(
                     url,
@@ -481,7 +487,7 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
                 .AwaitWithCancellationAsync(ct)
                 .ConfigureAwait(false);
 
-            _lastNavigationStatus = response?.Status;
+            Volatile.Write(ref _lastNavigationStatus, response?.Status ?? UnknownNavigationStatus);
             ct.ThrowIfCancellationRequested();
         }
         finally
@@ -738,7 +744,7 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
             if (response.Frame == _page?.MainFrame &&
                 string.Equals(response.Request.ResourceType, "document", StringComparison.OrdinalIgnoreCase))
             {
-                _lastNavigationStatus = response.Status;
+                Volatile.Write(ref _lastNavigationStatus, response.Status);
             }
         }
         catch (ObjectDisposedException)

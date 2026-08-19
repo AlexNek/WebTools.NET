@@ -32,7 +32,7 @@ public sealed class CloakBrowserContentFetcher : BrowserContentFetcherBase
         try
         {
             handle = await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = _headless })
-                .AwaitWithCancellationAsync(ct)
+                .AwaitWithCancellationAsync(ct, value => value.DisposeAsync().AsTask())
                 .ConfigureAwait(false);
             var context = await handle.RawBrowser
                 .NewContextAsync(BrowserFetcherDefaults.CreateContextOptions())

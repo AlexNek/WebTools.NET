@@ -82,7 +82,12 @@ public sealed class BrowserSession : IAsyncDisposable
 
         _shutdownCts.Cancel();
 
-        await _operationLock.WaitAsync().ConfigureAwait(false);
+        if (!await _operationLock.WaitAsync(DisposeTimeoutMs).ConfigureAwait(false))
+        {
+            _logger?.LogWarning("Session disposal timed out waiting for an active operation.");
+            return;
+        }
+
         try
         {
             if (_started && _options.StorageStatePath is not null)
@@ -642,7 +647,7 @@ public sealed class BrowserSession : IAsyncDisposable
             return LastSnapshotWithError(error);
         }
 
-        using var recoveryCts = new CancellationTokenSource(remaining);
+        using var recoveryCts = new CancellationTokenSource(DisposeTimeoutMs);
         using var operationCts = CancellationTokenSource.CreateLinkedTokenSource(
             ct,
             recoveryCts.Token,
@@ -659,7 +664,8 @@ public sealed class BrowserSession : IAsyncDisposable
 
         try
         {
-            await lifecycle.ResetAsync(CancellationToken.None).ConfigureAwait(false);
+            using var resetCts = new CancellationTokenSource(DisposeTimeoutMs);
+            await lifecycle.ResetAsync(resetCts.Token).WaitAsync(resetCts.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -797,6 +803,7 @@ public sealed class BrowserSession : IAsyncDisposable
         {
             EBrowserOperationType.Navigate when string.IsNullOrWhiteSpace(operation.Value)
                 => "Navigate requires a URL in Value.",
+            EBrowserOperationType.Navigate => ValidateNavigateUrl(operation.Value!),
             EBrowserOperationType.Click when operation.ElementIndex is null or <= 0
                 => "Click requires a positive ElementIndex.",
             EBrowserOperationType.Fill when operation.ElementIndex is null or <= 0
@@ -813,6 +820,19 @@ public sealed class BrowserSession : IAsyncDisposable
                 => "WaitFor TimeoutMs must be positive when specified.",
             _ => null
         };
+    }
+
+    private static string? ValidateNavigateUrl(string value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            return "Navigate requires a valid absolute URL in Value.";
+        }
+
+        return uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+            uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : "Navigate supports only http and https URLs.";
     }
 
     private void ThrowIfDisposed()
