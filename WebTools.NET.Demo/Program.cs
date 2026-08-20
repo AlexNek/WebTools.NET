@@ -246,9 +246,18 @@ async Task CheckUrlAsync(
             : string.Empty;
         ConsoleOutput.Ok($"reachable - HTTP {(int?)result.HttpStatus}{protection}");
 
-        if (result.RedirectCount > 0)
+        if (result.RedirectCount > 0 || result.ClientRedirectCount > 0)
         {
-            ConsoleOutput.Detail($"redirects: {result.RedirectCount}");
+            if (result.RedirectCount > 0)
+            {
+                ConsoleOutput.Detail($"http redirects: {result.RedirectCount}");
+            }
+
+            if (result.ClientRedirectCount > 0)
+            {
+                ConsoleOutput.Detail($"client redirects: {result.ClientRedirectCount}");
+            }
+
             ConsoleOutput.Detail($"final url: {result.FinalUrl}");
         }
     }

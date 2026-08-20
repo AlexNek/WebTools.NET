@@ -58,7 +58,8 @@ public sealed record UrlCheckResult(
     string? ErrorMessage,
     int RedirectCount = 0,
     string? FinalUrl = null,
-    string? ProtectionType = null);
+    string? ProtectionType = null,
+    int ClientRedirectCount = 0);
 ```
 
 | Property | Description |
@@ -68,4 +69,5 @@ public sealed record UrlCheckResult(
 | `ErrorMessage` | Failure reason when not reachable |
 | `RedirectCount` | Number of redirects followed |
 | `FinalUrl` | URL after redirects |
+| `ClientRedirectCount` | Number of observed main-frame client-side URL changes during the bounded browser observation window; can be greater than `1` |
 | `ProtectionType` | Detected protection type, when reported by the engine |

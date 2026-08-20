@@ -6,4 +6,7 @@ public sealed record UrlCheckResult(
     string? ErrorMessage,
     int RedirectCount = 0,
     string? FinalUrl = null,
-    string? ProtectionType = null);
+    string? ProtectionType = null)
+{
+    public int ClientRedirectCount { get; init; }
+}

@@ -110,7 +110,11 @@ var raw = await fetcher.FetchAsAsync(url, EContentFormat.Html, sanitizeLevel: ES
 Both accept a `headless` flag in their constructor (`true` by default) and
 are registered for you by `AddBrowserServices()`. Because content is read
 from the fully rendered page, JavaScript-heavy pages work the same as static
-ones.
+ones. Both implementations also use the shared browser reachability pipeline:
+reachability waits for post-load navigation to settle, observes the main frame
+for a bounded window so delayed client-side navigation can be detected, and
+captures the final browser URL and observed client-side redirect count. The
+two engines are alternatives selected by DI, not an automatic fallback chain.
 
 !!! tip
     Use the CloakBrowser engine when target pages block plain Playwright

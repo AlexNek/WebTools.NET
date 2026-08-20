@@ -16,6 +16,7 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
 
     private const int NavigateTimeoutMs = 15000;
 
+    // Browser-session navigation observes delayed client-side redirects asynchronously.
     private const int NetworkIdleTimeoutMs = 10000;
 
     private const int ReachabilityTimeoutMs = 10000;
@@ -73,6 +74,7 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
         {
             Volatile.Write(ref _lastNavigationStatus, UnknownNavigationStatus);
             var page = await GetPageAsync(ct).ConfigureAwait(false);
+            using var tracker = new BrowserNavigationTracker(page);
             var response = await page.GotoAsync(
                     url,
                     new PageGotoOptions
@@ -83,16 +85,16 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
                 .AwaitWithCancellationAsync(ct)
                 .ConfigureAwait(false);
 
+            var navigation = await tracker.ObserveAsync(
+                    response?.Url ?? page.Url,
+                    response?.Status ?? UnknownNavigationStatus,
+                    NetworkIdleTimeoutMs,
+                    ct)
+                .ConfigureAwait(false);
+            Volatile.Write(ref _lastNavigationStatus, navigation.Status);
             ct.ThrowIfCancellationRequested();
-            var status = response?.Status ?? UnknownNavigationStatus;
-            Volatile.Write(ref _lastNavigationStatus, response?.Status ?? UnknownNavigationStatus);
-            if (HttpStatusHelper.IsNotSuccess(status))
-            {
-                return false;
-            }
-
-            var finalUrl = page.Url;
-            return !HtmlUtils.IsErrorPageUrl(finalUrl);
+            return HttpStatusHelper.IsSuccessOrRedirect(navigation.Status) &&
+                   !HtmlUtils.IsErrorPageUrl(navigation.FinalUrl);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -477,17 +479,24 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
         {
             Volatile.Write(ref _lastNavigationStatus, UnknownNavigationStatus);
             var page = await GetPageAsync(ct).ConfigureAwait(false);
+            using var tracker = new BrowserNavigationTracker(page);
             var response = await page.GotoAsync(
                     url,
                     new PageGotoOptions
                     {
-                        WaitUntil = WaitUntilState.NetworkIdle,
+                        WaitUntil = WaitUntilState.DOMContentLoaded,
                         Timeout = NavigateTimeoutMs
                     })
                 .AwaitWithCancellationAsync(ct)
                 .ConfigureAwait(false);
 
-            Volatile.Write(ref _lastNavigationStatus, response?.Status ?? UnknownNavigationStatus);
+            var navigation = await tracker.ObserveAsync(
+                    response?.Url ?? page.Url,
+                    response?.Status ?? UnknownNavigationStatus,
+                    NetworkIdleTimeoutMs,
+                    ct)
+                .ConfigureAwait(false);
+            Volatile.Write(ref _lastNavigationStatus, navigation.Status);
             ct.ThrowIfCancellationRequested();
         }
         finally
