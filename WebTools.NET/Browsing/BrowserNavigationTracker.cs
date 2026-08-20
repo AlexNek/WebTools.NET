@@ -66,7 +66,6 @@ internal sealed class BrowserNavigationTracker : IDisposable
                 // Continue observing even when the page has persistent network activity.
             }
 
-            var urlBeforeStabilityWait = GetCurrentUrl();
             remainingMs = GetRemainingMilliseconds(startedAt, timeoutMs);
             if (remainingMs <= 0)
             {
@@ -77,11 +76,6 @@ internal sealed class BrowserNavigationTracker : IDisposable
                     TimeSpan.FromMilliseconds(Math.Min(UrlStabilityWaitMs, remainingMs)),
                     ct)
                 .ConfigureAwait(false);
-
-            if (AreEquivalentUrls(urlBeforeStabilityWait, GetCurrentUrl()))
-            {
-                continue;
-            }
         }
 
         return CreateResult();

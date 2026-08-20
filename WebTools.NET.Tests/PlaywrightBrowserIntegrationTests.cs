@@ -64,7 +64,7 @@ public class PlaywrightBrowserIntegrationTests
             "<html><body><h1>Target page</h1></body></html>",
             path => path switch
             {
-                "/" => Interlocked.Increment(ref targetRequests) == 1
+                "/" => Volatile.Read(ref targetRequests) == 1
                     ? System.Net.HttpStatusCode.Forbidden
                     : System.Net.HttpStatusCode.OK,
                 "/warmup" => System.Net.HttpStatusCode.Found,
@@ -72,9 +72,18 @@ public class PlaywrightBrowserIntegrationTests
                 _ => System.Net.HttpStatusCode.NotFound
             },
             locationProvider: path => path == "/warmup" ? "/warmup-final" : null,
-            bodyProvider: path => path == "/" && Volatile.Read(ref targetRequests) == 0
-                ? "<html><title>Just a moment</title><body>challenge-platform</body></html>"
-                : "<html><body><h1>Target page</h1></body></html>");
+            bodyProvider: path =>
+            {
+                if (path != "/")
+                {
+                    return "<html><body><h1>Target page</h1></body></html>";
+                }
+
+                var requestIndex = Interlocked.Increment(ref targetRequests);
+                return requestIndex == 1
+                    ? "<html><title>Just a moment</title><body>challenge-platform</body></html>"
+                    : "<html><body><h1>Target page</h1></body></html>";
+            });
         await using var fetcher = new PlaywrightContentFetcher(
             warmupUrl: server.Url + "warmup");
 
@@ -124,7 +133,7 @@ public class PlaywrightBrowserIntegrationTests
             <script>
               if (window.location.pathname === "/")
               {
-                  setTimeout(() => window.location.replace("/step1"), 1500);
+                  setTimeout(() => window.location.replace("/step1"), 800);
               }
               else if (window.location.pathname === "/step1")
               {

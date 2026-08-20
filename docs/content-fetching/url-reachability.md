@@ -95,11 +95,14 @@ navigation and includes cross-origin navigation when it is observed.
 
 Browser checks also distinguish server-side and client-side redirects:
 
-- `RedirectCount` represents HTTP redirect hops tracked by
-  `WebAccessService`. Browser content fetchers do not populate this count.
+- `RedirectCount` represents HTTP redirect hops. The plain-HTTP checker tracks
+  them through `WebAccessService`; browser fetchers can populate it from
+  `navigation.Navigation.RedirectCount`.
 - `ClientRedirectCount` represents observed browser-side URL changes after the
   initial navigation. It is `0` when none are observed and can be greater than
-  `1` for multi-hop client navigation.
+  `1` for multi-hop client navigation. The counters are independent; a
+  client-side navigation whose destination follows HTTP redirects can increment
+  both.
 - `FinalUrl` is still returned when a client-side navigation crosses origins.
 - `WebAccessService` uses plain HTTP and cannot execute JavaScript, so its
   `ClientRedirectCount` is always `0`.
@@ -126,7 +129,7 @@ exactly this kind of check internally.
 | `Reachable` | Whether the URL loaded successfully |
 | `HttpStatus` | Final HTTP status code, when available |
 | `ErrorMessage` | Failure reason, when not reachable |
-| `RedirectCount` | Number of HTTP redirects followed by the plain-HTTP checker; browser fetchers leave this at `0` |
+| `RedirectCount` | Number of HTTP redirect hops reported by the plain-HTTP checker or browser fetcher (`navigation.Navigation.RedirectCount`); `0` when none are observed |
 | `ClientRedirectCount` | Number of observed main-frame client-side URL changes during the bounded browser observation window; can be greater than `1` |
 | `FinalUrl` | URL after server-side and client-side browser navigation |
 | `ProtectionType` | Detected protection type, when reported by the engine |

@@ -104,7 +104,7 @@ internal sealed class TestHttpServer : IAsyncDisposable
                 .ConfigureAwait(false);
             if (read == 0)
             {
-                break;
+                return;
             }
 
             requestLength += read;

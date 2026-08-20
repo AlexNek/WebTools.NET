@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-21
+
 ### Changed
 
 - Browser-session reachability now uses the same accepted 2xx, 3xx, and 304 status policy as other reachability checkers; the URL-reachability documentation now describes that policy consistently.
