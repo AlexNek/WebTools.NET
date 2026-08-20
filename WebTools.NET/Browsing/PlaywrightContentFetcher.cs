@@ -112,22 +112,28 @@ public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
         return await WithNonHeadlessBrowserAsync<UrlCheckResult?>(
                 url,
                 ct,
-                (page, status, finalUrl, challengeDetected, challengeResolved) =>
+                async (page, status, finalUrl, challengeDetected, challengeResolved) =>
                 {
                     if (challengeDetected && challengeResolved)
                     {
                         status = 200;
                     }
 
-                    return Task.FromResult<UrlCheckResult?>(
-                        challengeDetected && !challengeResolved
-                            ? new UrlCheckResult(
-                                false,
-                                status,
-                                "Blocked by bot protection",
-                                FinalUrl: finalUrl,
-                                ProtectionType: "Cloudflare")
-                            : CreateReachabilityResult(status, finalUrl));
+                    if (challengeDetected && !challengeResolved)
+                    {
+                        return new UrlCheckResult(
+                            false,
+                            status,
+                            "Blocked by bot protection",
+                            FinalUrl: finalUrl,
+                            ProtectionType: "Cloudflare");
+                    }
+
+                    await WaitForNetworkIdleAsync(page, FallbackNetworkIdleWaitMs, ct)
+                        .ConfigureAwait(false);
+                    var postIdleUrl = page.Url;
+                    var clientRedirectCount = GetClientRedirectCount(finalUrl, postIdleUrl);
+                    return CreateReachabilityResult(status, postIdleUrl, clientRedirectCount);
                 })
             .ConfigureAwait(false);
     }

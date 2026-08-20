@@ -33,6 +33,34 @@ public class BrowserIntegrationTests
     }
 
     [Fact]
+    public async Task PlaywrightContentFetcher_ReachabilityDetectsClientSideRedirect()
+    {
+        // Arrange
+        await using var server = await TestHttpServer.StartAsync(
+            """
+            <html>
+              <body><h1>Redirecting page</h1></body>
+              <script>
+                if (window.location.pathname === "/")
+                {
+                    setTimeout(() => window.location.replace("/final"), 250);
+                }
+              </script>
+            </html>
+            """);
+        await using var fetcher = new PlaywrightContentFetcher();
+
+        // Act
+        var result = await fetcher.CheckReachabilityAsync(server.Url);
+
+        // Assert
+        result.Reachable.Should().BeTrue();
+        result.HttpStatus.Should().Be(200);
+        result.FinalUrl.Should().Be(server.Url + "final");
+        result.ClientRedirectCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task PlaywrightSearchProvider_CompletesSearchRoundTrip()
     {
         // Arrange

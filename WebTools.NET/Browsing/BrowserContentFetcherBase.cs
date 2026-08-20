@@ -288,7 +288,10 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
         return new WebContent(true, content, null, finalUrl);
     }
 
-    protected static UrlCheckResult CreateReachabilityResult(int status, string finalUrl)
+    protected static UrlCheckResult CreateReachabilityResult(
+        int status,
+        string finalUrl,
+        int clientRedirectCount = 0)
     {
         if (HttpStatusHelper.IsSuccess(status) && HtmlUtils.IsErrorPageUrl(finalUrl))
         {
@@ -296,12 +299,37 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
                 false,
                 status,
                 $"Redirected to error page ({finalUrl})",
-                FinalUrl: finalUrl);
+                FinalUrl: finalUrl,
+                ClientRedirectCount: clientRedirectCount);
         }
 
         return HttpStatusHelper.IsSuccessOrRedirect(status)
-            ? new UrlCheckResult(true, status, null, FinalUrl: finalUrl)
-            : new UrlCheckResult(false, status, $"HTTP {status}", FinalUrl: finalUrl);
+            ? new UrlCheckResult(
+                true,
+                status,
+                null,
+                FinalUrl: finalUrl,
+                ClientRedirectCount: clientRedirectCount)
+            : new UrlCheckResult(
+                false,
+                status,
+                $"HTTP {status}",
+                FinalUrl: finalUrl,
+                ClientRedirectCount: clientRedirectCount);
+    }
+
+    protected static int GetClientRedirectCount(string initialUrl, string finalUrl)
+    {
+        if (string.Equals(initialUrl, finalUrl, StringComparison.OrdinalIgnoreCase) ||
+            !Uri.TryCreate(initialUrl, UriKind.Absolute, out var initialUri) ||
+            !Uri.TryCreate(finalUrl, UriKind.Absolute, out var finalUri))
+        {
+            return 0;
+        }
+
+        return string.Equals(initialUri.Host, finalUri.Host, StringComparison.OrdinalIgnoreCase)
+            ? 1
+            : 0;
     }
 
     private async Task<(IPage Page, int Status, string FinalUrl)> NavigateWithRetryAsync(
@@ -370,8 +398,11 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
                     ProtectionType: "Cloudflare");
             }
 
+            await WaitForNetworkIdleAsync(page, NetworkIdleWaitMs, ct).ConfigureAwait(false);
+            var postIdleUrl = page.Url;
+            var clientRedirectCount = GetClientRedirectCount(finalUrl, postIdleUrl);
             ct.ThrowIfCancellationRequested();
-            return CreateReachabilityResult(status, finalUrl);
+            return CreateReachabilityResult(status, postIdleUrl, clientRedirectCount);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
