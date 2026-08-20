@@ -83,9 +83,26 @@ public class WebAccessServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CheckReachabilityAsync_RedirectWithoutLocation_ReturnsActualResponseError()
+    {
+        // Arrange
+        var handler = new FakeHttpMessageHandler(HttpStatusCode.Found, "redirect");
+        var httpClient = new HttpClient(handler);
+        _sut = new WebAccessService(httpClient);
+
+        // Act
+        var result = await _sut.CheckReachabilityAsync("https://test.example.com/start");
+
+        // Assert
+        result.Reachable.Should().BeFalse();
+        result.HttpStatus.Should().Be(302);
+        result.ErrorMessage.Should().Contain("Location");
+        result.RedirectCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task CheckReachabilityAsync_InvalidDomain_ReturnsErrorMessage()
     {
-        // Arrange — simulate DNS failure
         var handler = new FakeHttpMessageHandler(_ =>
             throw new HttpRequestException("No such host is known."));
         var httpClient = new HttpClient(handler);
@@ -101,20 +118,36 @@ public class WebAccessServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CheckReachabilityAsync_CancelledToken_ThrowsOrReturnsTimeout()
+    public async Task CheckReachabilityAsync_CancelledToken_PropagatesCancellation()
     {
-        // Arrange — simulate a timeout via already-cancelled token
+        // Arrange
         var handler = new FakeHttpMessageHandler(_ =>
             throw new TaskCanceledException("The operation was canceled."));
         var httpClient = new HttpClient(handler);
         _sut = new WebAccessService(httpClient);
         using var cts = new CancellationTokenSource();
+        cts.Cancel();
 
         // Act
-        var result = await _sut.CheckReachabilityAsync("https://test.example.com/slow", cts.Token);
+        var act = () => _sut.CheckReachabilityAsync("https://test.example.com/slow", cts.Token);
 
         // Assert
-        result.Reachable.Should().BeFalse();
-        result.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+    [Fact]
+    public async Task CheckReachabilityAsync_NotModifiedResponse_IsReachable()
+    {
+        // Arrange
+        var handler = new FakeHttpMessageHandler(HttpStatusCode.NotModified, "");
+        var httpClient = new HttpClient(handler);
+        _sut = new WebAccessService(httpClient);
+
+        // Act
+        var result = await _sut.CheckReachabilityAsync("https://test.example.com/cached");
+
+        // Assert
+        result.Reachable.Should().BeTrue();
+        result.HttpStatus.Should().Be(304);
+        result.ErrorMessage.Should().BeNull();
     }
 }

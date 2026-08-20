@@ -27,7 +27,7 @@ Behavior details:
 
 - Follows up to **10 redirects**; more yields `Reachable = false` with a
   "too many redirects" error
-- A URL is reachable when the final status is `2xx` or `3xx` (excluding 304)
+- A URL is reachable when the final status is `2xx` or `3xx` (including 304)
 - 15 second overall request timeout; timeouts yield
   `ErrorMessage = "Timed out"`
 - Handles both absolute and relative `Location` headers
@@ -45,6 +45,11 @@ browser engine, waits for post-load navigation to settle, and reports
 and the final URL is not a browser error page. `FinalUrl` is the browser's URL
 after that wait, so it includes a JavaScript redirect or other browser-side
 navigation that occurs after the initial response.
+
+`IBrowserSession.CheckReachabilityAsync` uses the same accepted reachability
+status policy, including supported 3xx statuses and 304, while still exposing
+only a boolean result. Use `IWebContentFetcher` when the final URL and client
+redirect metadata are required.
 
 ```csharp
 var check = await fetcher.CheckReachabilityAsync("https://test.example.com");
@@ -70,19 +75,32 @@ FinalUrl             = https://test.example.com/
 ```
 
 `FinalUrl` is captured after the browser has waited for post-load navigation,
-not immediately when the initial HTTP response arrives. `ClientRedirectCount`
-is intentionally limited to `0` or `1`: it indicates that a same-host
-client-side URL change was observed. A cross-host client-side navigation still
-updates `FinalUrl`, but leaves `ClientRedirectCount` at `0`.
+not immediately when the initial HTTP response arrives. The browser keeps
+observing the main frame for a bounded window because client-side navigation
+may be scheduled after `DOMContentLoaded` or after the page first becomes
+network-idle. Redirects that occur after that window cannot be observed.
+
+The default observation window is **5 seconds** for the normal browser content
+fetcher and **10 seconds** for the visible-browser fallback and browser-session
+navigation. This delay is intentional: the browser must remain available long
+enough to observe delayed JavaScript, meta-refresh, or SPA navigation before it
+can return a final result. The waits are fully asynchronous—the implementation
+awaits Playwright and `Task.Delay` operations and does not block an application
+thread with `Thread.Sleep` or a synchronous wait. Cancellation can interrupt
+the pending operation.
+
+`ClientRedirectCount` is the number of observed main-frame client-side URL
+changes during that window. It may be greater than `1` for multi-hop
+navigation and includes cross-origin navigation when it is observed.
 
 Browser checks also distinguish server-side and client-side redirects:
 
 - `RedirectCount` represents HTTP redirect hops tracked by
   `WebAccessService`. Browser content fetchers do not populate this count.
-- `ClientRedirectCount` is `1` when the browser URL changes to another URL on
-  the same host after the initial navigation; otherwise it is `0`.
-- A cross-host client-side navigation is still returned in `FinalUrl`, but is
-  not included in `ClientRedirectCount`.
+- `ClientRedirectCount` represents observed browser-side URL changes after the
+  initial navigation. It is `0` when none are observed and can be greater than
+  `1` for multi-hop client navigation.
+- `FinalUrl` is still returned when a client-side navigation crosses origins.
 - `WebAccessService` uses plain HTTP and cannot execute JavaScript, so its
   `ClientRedirectCount` is always `0`.
 
@@ -109,6 +127,6 @@ exactly this kind of check internally.
 | `HttpStatus` | Final HTTP status code, when available |
 | `ErrorMessage` | Failure reason, when not reachable |
 | `RedirectCount` | Number of HTTP redirects followed by the plain-HTTP checker; browser fetchers leave this at `0` |
-| `ClientRedirectCount` | Number of same-host client-side URL changes observed after browser page load (`0` or `1`) |
+| `ClientRedirectCount` | Number of observed main-frame client-side URL changes during the bounded browser observation window; can be greater than `1` |
 | `FinalUrl` | URL after server-side and client-side browser navigation |
 | `ProtectionType` | Detected protection type, when reported by the engine |

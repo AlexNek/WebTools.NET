@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Browser-session reachability now uses the same accepted 2xx, 3xx, and 304 status policy as other reachability checkers; the URL-reachability documentation now describes that policy consistently.
+- Browser integration coverage is split into local browser tests and live-network tests so local redirect regressions can run in a dedicated CI job.
+
 ### Fixed
 
-- Browser reachability checks now wait for post-load navigation and report client-side redirects through the final URL and `ClientRedirectCount`.
+- Browser reachability checks now observe post-load client-side navigation across content fetchers and browser sessions, use bounded asynchronous observation windows to allow delayed redirects without blocking application threads, report the final document status and URL, track HTTP and same- or cross-origin client redirects separately, preserve both redirect counts on blocked results, and retain the final document status after a bot challenge resolves.
+- The demo now displays HTTP and client-side redirect counts and the final URL for browser-side navigation.
 
 ## [1.3.0] - 2026-08-20
 

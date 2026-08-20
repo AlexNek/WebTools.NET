@@ -14,6 +14,7 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
     protected const int ErrorContentLimit = 3000;
     protected const int FetchGotoTimeoutMs = 20_000;
     protected const int GotoTimeoutMs = 15_000;
+    // Total asynchronous post-load observation window for normal content operations.
     protected const int NetworkIdleWaitMs = 5_000;
 
     private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -291,7 +292,8 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
     protected static UrlCheckResult CreateReachabilityResult(
         int status,
         string finalUrl,
-        int clientRedirectCount = 0)
+        int clientRedirectCount = 0,
+        int redirectCount = 0)
     {
         if (HttpStatusHelper.IsSuccess(status) && HtmlUtils.IsErrorPageUrl(finalUrl))
         {
@@ -299,8 +301,11 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
                 false,
                 status,
                 $"Redirected to error page ({finalUrl})",
-                FinalUrl: finalUrl,
-                ClientRedirectCount: clientRedirectCount);
+                RedirectCount: redirectCount,
+                FinalUrl: finalUrl)
+            {
+                ClientRedirectCount = clientRedirectCount
+            };
         }
 
         return HttpStatusHelper.IsSuccessOrRedirect(status)
@@ -308,40 +313,34 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
                 true,
                 status,
                 null,
-                FinalUrl: finalUrl,
-                ClientRedirectCount: clientRedirectCount)
+                RedirectCount: redirectCount,
+                FinalUrl: finalUrl)
+            {
+                ClientRedirectCount = clientRedirectCount
+            }
             : new UrlCheckResult(
                 false,
                 status,
                 $"HTTP {status}",
-                FinalUrl: finalUrl,
-                ClientRedirectCount: clientRedirectCount);
+                RedirectCount: redirectCount,
+                FinalUrl: finalUrl)
+            {
+                ClientRedirectCount = clientRedirectCount
+            };
     }
 
-    protected static int GetClientRedirectCount(string initialUrl, string finalUrl)
-    {
-        if (string.Equals(initialUrl, finalUrl, StringComparison.OrdinalIgnoreCase) ||
-            !Uri.TryCreate(initialUrl, UriKind.Absolute, out var initialUri) ||
-            !Uri.TryCreate(finalUrl, UriKind.Absolute, out var finalUri))
-        {
-            return 0;
-        }
-
-        return string.Equals(initialUri.Host, finalUri.Host, StringComparison.OrdinalIgnoreCase)
-            ? 1
-            : 0;
-    }
-
-    private async Task<(IPage Page, int Status, string FinalUrl)> NavigateWithRetryAsync(
+    private async Task<(IPage Page, BrowserNavigationResult Navigation)> NavigateWithRetryAsync(
         string url,
         int initialTimeoutMs,
         CancellationToken ct)
     {
         var context = await GetContextAsync(ct).ConfigureAwait(false);
         IPage? page = null;
+        BrowserNavigationTracker? tracker = null;
         try
         {
             page = await CreatePageAsync(context, ct).ConfigureAwait(false);
+            tracker = new BrowserNavigationTracker(page);
             var response = await page.GotoAsync(
                     url,
                     new PageGotoOptions
@@ -352,25 +351,41 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
                 .AwaitWithCancellationAsync(ct)
                 .ConfigureAwait(false);
 
-            var status = response?.Status ?? 0;
-            var finalUrl = page.Url;
-            if (status == HttpStatusHelper.Forbidden)
+            var navigation = await tracker.ObserveAsync(
+                    response?.Url ?? page.Url,
+                    response?.Status ?? 0,
+                    NetworkIdleWaitMs,
+                    ct)
+                .ConfigureAwait(false);
+            if (navigation.Status == HttpStatusHelper.Forbidden)
             {
+                tracker.Dispose();
+                tracker = null;
                 await ClosePageAsync(page).ConfigureAwait(false);
                 page = await CreatePageAsync(context, ct).ConfigureAwait(false);
-                response = await BrowserHelpers.WarmupAndGotoAsync(
-                        page, url, GotoTimeoutMs, ct, WarmupUrl)
+                await BrowserHelpers.WarmupAsync(page, ct, WarmupUrl).ConfigureAwait(false);
+                tracker = new BrowserNavigationTracker(page);
+                response = await BrowserHelpers.GotoAsync(
+                        page, url, GotoTimeoutMs, ct)
                     .ConfigureAwait(false);
-                status = response?.Status ?? 0;
-                finalUrl = page.Url;
+                navigation = await tracker.ObserveAsync(
+                        response?.Url ?? page.Url,
+                        response?.Status ?? 0,
+                        NetworkIdleWaitMs,
+                        ct)
+                    .ConfigureAwait(false);
             }
 
-            return (page, status, finalUrl);
+            return (page, navigation);
         }
         catch
         {
             await ClosePageAsync(page).ConfigureAwait(false);
             throw;
+        }
+        finally
+        {
+            tracker?.Dispose();
         }
     }
 
@@ -384,25 +399,28 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
             var navigation = await NavigateWithRetryAsync(url, GotoTimeoutMs, ct)
                 .ConfigureAwait(false);
             page = navigation.Page;
-            var status = navigation.Status;
-            var finalUrl = navigation.FinalUrl;
 
             if (await IsBotChallengePageAsync(page, ct).ConfigureAwait(false))
             {
                 var fallback = await TryReachabilityFallbackAsync(url, ct).ConfigureAwait(false);
                 return fallback ?? new UrlCheckResult(
                     false,
-                    status,
+                    navigation.Navigation.Status,
                     "Blocked by bot protection",
-                    FinalUrl: finalUrl,
-                    ProtectionType: "Cloudflare");
+                    RedirectCount: navigation.Navigation.RedirectCount,
+                    FinalUrl: navigation.Navigation.FinalUrl,
+                    ProtectionType: "Cloudflare")
+                {
+                    ClientRedirectCount = navigation.Navigation.ClientRedirectCount
+                };
             }
 
-            await WaitForNetworkIdleAsync(page, NetworkIdleWaitMs, ct).ConfigureAwait(false);
-            var postIdleUrl = page.Url;
-            var clientRedirectCount = GetClientRedirectCount(finalUrl, postIdleUrl);
             ct.ThrowIfCancellationRequested();
-            return CreateReachabilityResult(status, postIdleUrl, clientRedirectCount);
+            return CreateReachabilityResult(
+                status: navigation.Navigation.Status,
+                finalUrl: navigation.Navigation.FinalUrl,
+                redirectCount: navigation.Navigation.RedirectCount,
+                clientRedirectCount: navigation.Navigation.ClientRedirectCount);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -440,22 +458,28 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
             var navigation = await NavigateWithRetryAsync(url, FetchGotoTimeoutMs, ct)
                 .ConfigureAwait(false);
             page = navigation.Page;
-            var status = navigation.Status;
-            var finalUrl = navigation.FinalUrl;
 
             if (await IsBotChallengePageAsync(page, ct).ConfigureAwait(false))
             {
                 var fallback = await TryFetchFallbackAsync(
                         url, format, maxContentLength, sanitizeLevel, ct)
                     .ConfigureAwait(false);
-                return fallback ?? new WebContent(false, "", "Blocked by bot protection", finalUrl);
+                return fallback ?? new WebContent(
+                    false,
+                    "",
+                    "Blocked by bot protection",
+                    navigation.Navigation.FinalUrl);
             }
 
-            await WaitForNetworkIdleAsync(page, NetworkIdleWaitMs, ct).ConfigureAwait(false);
-            finalUrl = page.Url;
             var rawBody = await GetRawBodyAsync(page, format, ct).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
-            return CreateFetchResult(rawBody, finalUrl, status, format, maxContentLength, sanitizeLevel);
+            return CreateFetchResult(
+                rawBody,
+                navigation.Navigation.FinalUrl,
+                navigation.Navigation.Status,
+                format,
+                maxContentLength,
+                sanitizeLevel);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

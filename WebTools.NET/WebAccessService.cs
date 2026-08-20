@@ -1,6 +1,7 @@
 using System.Net;
 
 using WebTools.NET.Abstractions;
+using WebTools.NET.Internal;
 using WebTools.NET.Models;
 
 namespace WebTools.NET;
@@ -78,11 +79,18 @@ public sealed class WebAccessService : IWebAccessService, IDisposable
 
             var status = (int)response.StatusCode;
 
-            if (status >= 300 && status < 400 && status != 304)
+            if (HttpStatusHelper.IsRedirect(status))
             {
                 var location = response.Headers.Location;
                 if (location is null)
-                    break;
+                {
+                    return new UrlCheckResult(
+                        false,
+                        status,
+                        $"HTTP {status} redirect missing Location header",
+                        redirectCount,
+                        currentUrl);
+                }
 
                 currentUrl = location.IsAbsoluteUri
                                  ? location.ToString()
@@ -92,7 +100,7 @@ public sealed class WebAccessService : IWebAccessService, IDisposable
             }
 
             var finalUrl = response.RequestMessage?.RequestUri?.ToString() ?? currentUrl;
-            var reachable = status >= 200 && status < 400;
+            var reachable = HttpStatusHelper.IsSuccessOrRedirect(status);
 
             return new UrlCheckResult(
                 reachable,

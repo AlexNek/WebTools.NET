@@ -8,6 +8,7 @@ namespace WebTools.NET.Browsing;
 public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
 {
     private const int ChallengeWaitMs = 30_000;
+    // Extended asynchronous observation window used by the visible fallback.
     private const int FallbackNetworkIdleWaitMs = 10_000;
     private const int FallbackTimeoutMs = 90_000;
 
@@ -112,28 +113,31 @@ public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
         return await WithNonHeadlessBrowserAsync<UrlCheckResult?>(
                 url,
                 ct,
-                async (page, status, finalUrl, challengeDetected, challengeResolved) =>
+                async (page, navigation, challengeDetected, challengeResolved) =>
                 {
-                    if (challengeDetected && challengeResolved)
-                    {
-                        status = 200;
-                    }
-
                     if (challengeDetected && !challengeResolved)
                     {
                         return new UrlCheckResult(
                             false,
-                            status,
+                            navigation.Status,
                             "Blocked by bot protection",
-                            FinalUrl: finalUrl,
-                            ProtectionType: "Cloudflare");
+                            RedirectCount: navigation.RedirectCount,
+                            FinalUrl: navigation.FinalUrl,
+                            ProtectionType: "Cloudflare")
+                        {
+                            ClientRedirectCount = navigation.ClientRedirectCount
+                        };
                     }
 
-                    await WaitForNetworkIdleAsync(page, FallbackNetworkIdleWaitMs, ct)
-                        .ConfigureAwait(false);
-                    var postIdleUrl = page.Url;
-                    var clientRedirectCount = GetClientRedirectCount(finalUrl, postIdleUrl);
-                    return CreateReachabilityResult(status, postIdleUrl, clientRedirectCount);
+                    var status = BrowserHelpers.NormalizeStatusAfterChallenge(
+                        navigation.Status,
+                        challengeResolved,
+                        navigation.HasPostInitialDocumentResponse);
+                    return CreateReachabilityResult(
+                        status: status,
+                        finalUrl: navigation.FinalUrl,
+                        redirectCount: navigation.RedirectCount,
+                        clientRedirectCount: navigation.ClientRedirectCount);
                 })
             .ConfigureAwait(false);
     }
@@ -153,25 +157,25 @@ public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
         return await WithNonHeadlessBrowserAsync<WebContent?>(
                 url,
                 ct,
-                async (page, status, finalUrl, challengeDetected, challengeResolved) =>
+                async (page, navigation, challengeDetected, challengeResolved) =>
                 {
                     if (challengeDetected && !challengeResolved)
                     {
-                        return new WebContent(false, "", "Blocked by bot protection", finalUrl);
+                        return new WebContent(
+                            false,
+                            "",
+                            "Blocked by bot protection",
+                            navigation.FinalUrl);
                     }
 
-                    if (challengeDetected && challengeResolved)
-                    {
-                        status = 200;
-                    }
-
-                    await WaitForNetworkIdleAsync(page, FallbackNetworkIdleWaitMs, ct)
-                        .ConfigureAwait(false);
-                    finalUrl = page.Url;
                     var rawBody = await GetRawBodyAsync(page, format, ct).ConfigureAwait(false);
+                    var status = BrowserHelpers.NormalizeStatusAfterChallenge(
+                        navigation.Status,
+                        challengeResolved,
+                        navigation.HasPostInitialDocumentResponse);
                     return CreateFetchResult(
                         rawBody,
-                        finalUrl,
+                        navigation.FinalUrl,
                         status,
                         format,
                         maxContentLength,
@@ -213,13 +217,14 @@ public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
     private async Task<T> WithNonHeadlessBrowserAsync<T>(
         string url,
         CancellationToken ct,
-        Func<IPage, int, string, bool, bool, Task<T>> actionAsync)
+        Func<IPage, BrowserNavigationResult, bool, bool, Task<T>> actionAsync)
     {
         await _fallbackLock.WaitAsync(ct).ConfigureAwait(false);
         IPlaywright? playwright = null;
         IBrowser? browser = null;
         IBrowserContext? context = null;
         IPage? page = null;
+        BrowserNavigationTracker? tracker = null;
         try
         {
             ct.ThrowIfCancellationRequested();
@@ -244,6 +249,7 @@ public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
                 // Minimal stealth is best effort for the visible fallback.
             }
 
+            tracker = new BrowserNavigationTracker(page);
             var response = await page.GotoAsync(
                     url,
                     new PageGotoOptions
@@ -254,8 +260,8 @@ public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
                 .AwaitWithCancellationAsync(ct)
                 .ConfigureAwait(false);
 
-            var status = response?.Status ?? 0;
-            var finalUrl = page.Url;
+            var initialStatus = response?.Status ?? 0;
+            var initialUrl = response?.Url ?? page.Url;
             var challengeDetected = await IsBotChallengePageAsync(page, ct).ConfigureAwait(false);
             var challengeResolved = false;
 
@@ -275,21 +281,22 @@ public sealed class PlaywrightContentFetcher : BrowserContentFetcherBase
                     // Challenge did not resolve within the configured window.
                 }
 
-                finalUrl = page.Url;
                 challengeResolved &= !await IsBotChallengePageAsync(page, ct).ConfigureAwait(false);
             }
 
-            finalUrl = page.Url;
-            return await actionAsync(
-                    page,
-                    status,
-                    finalUrl,
-                    challengeDetected,
-                    challengeResolved)
+            var navigation = await tracker.ObserveAsync(
+                    initialUrl,
+                    initialStatus,
+                    FallbackNetworkIdleWaitMs,
+                    ct)
+                .ConfigureAwait(false);
+
+            return await actionAsync(page, navigation, challengeDetected, challengeResolved)
                 .ConfigureAwait(false);
         }
         finally
         {
+            tracker?.Dispose();
             try
             {
                 await ClosePageAsync(page).ConfigureAwait(false);
