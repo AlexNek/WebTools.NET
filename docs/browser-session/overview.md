@@ -36,8 +36,9 @@ var snapshot = await session.StartAsync("https://test.example.com");
 Select `EContentFormat.MarkdownWithAbsoluteUrls` through `BrowserSessionOptions.DefaultFormat` when snapshots must be self-contained:
 
 ```csharp
+await using var standaloneBrowser = factory.Create();
 await using var standaloneSession = new BrowserSession(
-    browser,
+    standaloneBrowser,
     new BrowserSessionOptions
     {
         DefaultFormat = EContentFormat.MarkdownWithAbsoluteUrls
