@@ -12,5 +12,8 @@ public enum EContentFormat
     Markdown = 1,
 
     /// <summary>Return rendered body HTML with noise tags removed.</summary>
-    Html = 2
+    Html = 2,
+
+    /// <summary>Convert to GitHub-flavored Markdown and resolve relative href/src URLs to absolute URLs.</summary>
+    MarkdownWithAbsoluteUrls = 3
 }

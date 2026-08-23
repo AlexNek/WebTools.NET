@@ -26,7 +26,7 @@ public interface IWebContentFetcher : IAsyncDisposable
     /// Fetches the content of the given URL in the specified format.
     /// </summary>
     /// <param name="url">The URL to fetch.</param>
-    /// <param name="format">Output format: PlainText, Markdown, or Html.</param>
+    /// <param name="format">Output format: PlainText, Markdown, MarkdownWithAbsoluteUrls, or Html.</param>
     /// <param name="maxContentLength">
     /// Maximum number of characters to return. When <c>null</c>, the full
     /// content is returned without truncation.

@@ -50,8 +50,13 @@ Passing `null` (the default) returns everything. Passing a value ≤ 0 throws
 Use `FetchAsAsync` to control the output format:
 
 ```csharp
-// Get page content as Markdown (preserves tables, headings, links, images)
+// Get page content as Markdown (preserves tables, headings, relative links, images)
 var md = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.Markdown);
+
+// Get standalone Markdown with relative href/src values resolved against the final URL
+var standaloneMd = await fetcher.FetchAsAsync(
+    "https://test.example.com/docs/",
+    EContentFormat.MarkdownWithAbsoluteUrls);
 
 // Get raw HTML with noise removed (scripts, styles, nav, footer stripped)
 var html = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.Html);
@@ -63,10 +68,12 @@ var text = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat
 | Format | Output | Best for |
 | --- | --- | --- |
 | `PlainText` | Stripped text, whitespace collapsed | Token-efficient LLM input |
-| `Markdown` | GitHub-flavored Markdown with tables, headings, links, images | LLMs that benefit from structure |
+| `Markdown` | GitHub-flavored Markdown with tables, headings, relative links, images | LLMs that benefit from structure when the source URL is available |
+| `MarkdownWithAbsoluteUrls` | GitHub-flavored Markdown with relative `href`/`src` values resolved against the final page URL | Standalone indexing and downstream processing |
 | `Html` | Body HTML with noise tags removed | Downstream HTML processing |
 
-`maxContentLength` works with all formats — it applies after conversion:
+`MarkdownWithAbsoluteUrls` resolves relative `href` and `src` values against the final browser URL, including after redirects. Existing `Markdown` output preserves relative values. URL expansion happens before conversion and truncation, so `maxContentLength` applies to the final Markdown representation. With `ESanitizeLevel.None`, fragment-only navigation lists are preserved.
+
 
 ```csharp
 var md = await fetcher.FetchAsAsync(

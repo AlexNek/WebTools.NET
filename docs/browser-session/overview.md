@@ -33,6 +33,19 @@ await using var session = new BrowserSession(
 var snapshot = await session.StartAsync("https://test.example.com");
 ```
 
+Select `EContentFormat.MarkdownWithAbsoluteUrls` through `BrowserSessionOptions.DefaultFormat` when snapshots must be self-contained:
+
+```csharp
+await using var standaloneSession = new BrowserSession(
+    browser,
+    new BrowserSessionOptions
+    {
+        DefaultFormat = EContentFormat.MarkdownWithAbsoluteUrls
+    });
+
+var standaloneSnapshot = await standaloneSession.StartAsync("https://test.example.com/docs/");
+```
+
 For dependency injection, resolve `IBrowserSessionFactory` and create a fresh
 session for each workflow. Do not share one browser session between independent
 workflows.

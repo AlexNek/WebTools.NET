@@ -1,6 +1,7 @@
 using FluentAssertions;
 
 using WebTools.NET.Browsing;
+using WebTools.NET.Models;
 
 using Xunit;
 
@@ -28,6 +29,29 @@ public class PlaywrightBrowserIntegrationTests
         // Assert
         result.Success.Should().BeTrue();
         result.Content.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task PlaywrightContentFetcher_MarkdownWithAbsoluteUrls_UsesFinalRedirectedUrl()
+    {
+        // Arrange
+        await using var server = await TestHttpServer.StartAsync(
+            "<html><body><a href=\"details\">Details</a></body></html>",
+            path => path == "/" ? System.Net.HttpStatusCode.Found : System.Net.HttpStatusCode.OK,
+            locationProvider: path => path == "/" ? "/final" : null);
+        await using var fetcher = new PlaywrightContentFetcher();
+        var finalUrl = server.Url + "final";
+        var expectedLink = new Uri(new Uri(finalUrl), "details").AbsoluteUri;
+
+        // Act
+        var result = await fetcher.FetchAsAsync(
+            server.Url,
+            EContentFormat.MarkdownWithAbsoluteUrls);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.FinalUrl.Should().Be(finalUrl);
+        result.Content.Should().Contain(expectedLink);
     }
 
     [Fact]

@@ -418,7 +418,8 @@ public sealed class BrowserSession : IAsyncDisposable
         try
         {
             operationToken.ThrowIfCancellationRequested();
-            content = ContentProcessor.Process(html, _format, null, ESanitizeLevel.Minimal);
+            var baseUrl = _format == EContentFormat.MarkdownWithAbsoluteUrls ? url : null;
+            content = ContentProcessor.Process(html, _format, null, ESanitizeLevel.Minimal, baseUrl);
         }
         catch (OperationCanceledException) when (callerToken.IsCancellationRequested)
         {
