@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-23
+
 ### Added
 
 - Markdown conversion strips fragment-only navigation lists (e.g., MkDocs "On this page" TOC blocks) where every link is a `#anchor` and there are at least 3 items for sanitized conversions, while `ESanitizeLevel.None` preserves the original list content.
