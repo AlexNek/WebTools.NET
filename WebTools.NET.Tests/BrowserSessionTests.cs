@@ -179,6 +179,72 @@ public class BrowserSessionTests
     }
 
     [Fact]
+    public async Task StartAsync_MarkdownWithAbsoluteUrls_UsesCurrentPageUrl()
+    {
+        // Arrange
+        var browser = CreateBrowser();
+        browser.GetCurrentUrlAsync(Arg.Any<CancellationToken>())
+            .Returns("https://test.example.com/docs/");
+        browser.GetHtmlAsync(Arg.Any<CancellationToken>())
+            .Returns("<a href=\"guide\">Guide</a>");
+        await using var sut = new BrowserSession(
+            browser,
+            new BrowserSessionOptions { DefaultFormat = EContentFormat.MarkdownWithAbsoluteUrls });
+
+        // Act
+        var snapshot = await sut.StartAsync("https://test.example.com/start");
+
+        // Assert
+        snapshot.Format.Should().Be(EContentFormat.MarkdownWithAbsoluteUrls);
+        snapshot.Content.Should().Contain("https://test.example.com/docs/guide");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not a URL")]
+    public async Task StartAsync_MarkdownWithAbsoluteUrls_WhenCurrentUrlIsInvalid_PreservesRelativeUrls(
+        string currentUrl)
+    {
+        // Arrange
+        var browser = CreateBrowser();
+        browser.GetCurrentUrlAsync(Arg.Any<CancellationToken>()).Returns(currentUrl);
+        browser.GetHtmlAsync(Arg.Any<CancellationToken>())
+            .Returns("<a href=\"guide\">Guide</a>");
+        await using var sut = new BrowserSession(
+            browser,
+            new BrowserSessionOptions { DefaultFormat = EContentFormat.MarkdownWithAbsoluteUrls });
+
+        // Act
+        var snapshot = await sut.StartAsync("https://test.example.com/start");
+
+        // Assert
+        snapshot.Content.Should().Contain("[Guide](guide)");
+        snapshot.Content.Should().NotContain("https://test.example.com/guide");
+        snapshot.Error.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task StartAsync_MarkdownWithAbsoluteUrls_WhenCurrentUrlCaptureFails_PreservesContent()
+    {
+        // Arrange
+        var browser = CreateBrowser();
+        browser.GetCurrentUrlAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<string>(new InvalidOperationException("URL unavailable.")));
+        browser.GetHtmlAsync(Arg.Any<CancellationToken>())
+            .Returns("<a href=\"guide\">Guide</a>");
+        await using var sut = new BrowserSession(
+            browser,
+            new BrowserSessionOptions { DefaultFormat = EContentFormat.MarkdownWithAbsoluteUrls });
+
+        // Act
+        var snapshot = await sut.StartAsync("https://test.example.com/start");
+
+        // Assert
+        snapshot.Content.Should().Contain("[Guide](guide)");
+        snapshot.Error.Should().Be("URL unavailable.");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_FillFormWithInvalidCheckboxValue_ReturnsValidationError()
     {
         // Arrange

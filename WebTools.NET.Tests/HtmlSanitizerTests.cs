@@ -10,6 +10,62 @@ namespace WebTools.NET.Tests;
 public class HtmlSanitizerTests
 {
     [Fact]
+    public void ResolveRelativeUrls_ResolvesHrefAndSrcAgainstBaseUrl()
+    {
+        // Arrange
+        var html = "<a href=\"/docs\">Root</a>"
+                   + "<a href='overview'>Relative</a>"
+                   + "<a href = \"?tab=api\">Query</a>"
+                   + "<a href=\"#details\">Fragment</a>"
+                   + "<img src=\"//cdn.example.com/logo.png\" alt=\"Logo\">";
+
+        // Act
+        var result = HtmlSanitizer.ResolveRelativeUrls(html, "https://test.example.com/docs/");
+
+        // Assert
+        result.Should().Contain("href=\"https://test.example.com/docs\"");
+        result.Should().Contain("href=\"https://test.example.com/docs/overview\"");
+        result.Should().Contain("href=\"https://test.example.com/docs/?tab=api\"");
+        result.Should().Contain("href=\"https://test.example.com/docs/#details\"");
+        result.Should().Contain("src=\"https://cdn.example.com/logo.png\"");
+    }
+
+    [Fact]
+    public void ResolveRelativeUrls_PreservesAbsoluteSpecialAndUnrelatedAttributes()
+    {
+        // Arrange
+        var html = "<a href=\"https://test.example.com/already\">Absolute</a>"
+                   + "<a href=\"mailto:test@example.com\">Mail</a>"
+                   + "<a href=\"javascript:void(0)\">Script</a>"
+                   + "<img src=\"data:image/png;base64,fake\" srcset=\"image-2x.png 2x\" alt=\"Image\">"
+                   + "<a href=\"\">Empty</a>";
+
+        // Act
+        var result = HtmlSanitizer.ResolveRelativeUrls(html, "https://test.example.com/docs/");
+
+        // Assert
+        result.Should().Contain("https://test.example.com/already");
+        result.Should().Contain("mailto:test@example.com");
+        result.Should().Contain("javascript:void(0)");
+        result.Should().Contain("data:image/png;base64,fake");
+        result.Should().Contain("srcset=\"image-2x.png 2x\"");
+        result.Should().Contain("href=\"\"");
+    }
+
+    [Fact]
+    public void ResolveRelativeUrls_InvalidBaseUrl_ReturnsOriginalHtml()
+    {
+        // Arrange
+        var html = "<a href=\"relative\">Link</a>";
+
+        // Act
+        var result = HtmlSanitizer.ResolveRelativeUrls(html, "not an absolute URL");
+
+        // Assert
+        result.Should().Be(html);
+    }
+
+    [Fact]
     public void RemoveNoiseTags_RemovesScriptStyleNavFooterHeader()
     {
         // Arrange

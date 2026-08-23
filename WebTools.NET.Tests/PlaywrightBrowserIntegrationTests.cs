@@ -1,6 +1,7 @@
 using FluentAssertions;
 
 using WebTools.NET.Browsing;
+using WebTools.NET.Models;
 
 using Xunit;
 
@@ -28,6 +29,81 @@ public class PlaywrightBrowserIntegrationTests
         // Assert
         result.Success.Should().BeTrue();
         result.Content.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task PlaywrightContentFetcher_MarkdownWithAbsoluteUrls_UsesFinalRedirectedUrl()
+    {
+        // Arrange
+        await using var server = await TestHttpServer.StartAsync(
+            "<html><body><a href=\"details\">Details</a></body></html>",
+            path => path == "/" ? System.Net.HttpStatusCode.Found : System.Net.HttpStatusCode.OK,
+            locationProvider: path => path == "/" ? "/final" : null);
+        await using var fetcher = new PlaywrightContentFetcher();
+        var finalUrl = server.Url + "final";
+        var expectedLink = new Uri(new Uri(finalUrl), "details").AbsoluteUri;
+
+        // Act
+        var result = await fetcher.FetchAsAsync(
+            server.Url,
+            EContentFormat.MarkdownWithAbsoluteUrls);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.FinalUrl.Should().Be(finalUrl);
+        result.Content.Should().Contain(expectedLink);
+    }
+
+    [Fact]
+    public async Task PlaywrightContentFetcher_Markdown_PreservesRelativeUrls()
+    {
+        // Arrange
+        await using var server = await TestHttpServer.StartAsync(
+            "<html><body><a href=\"details\">Details</a></body></html>");
+        await using var fetcher = new PlaywrightContentFetcher();
+
+        // Act
+        var result = await fetcher.FetchAsAsync(server.Url, EContentFormat.Markdown);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.Content.Should().Contain("[Details](details)");
+        result.Content.Should().NotContain(server.Url + "details");
+    }
+
+    [Fact]
+    public async Task PlaywrightContentFetcher_MarkdownWithAbsoluteUrls_VisibleFallbackUsesFallbackFinalUrl()
+    {
+        // Arrange
+        var rootRequests = 0;
+        await using var server = await TestHttpServer.StartAsync(
+            "<html><title>Just a moment</title><body>challenge-platform</body></html>",
+            statusProvider: path => path == "/" && Volatile.Read(ref rootRequests) >= 2
+                ? System.Net.HttpStatusCode.Found
+                : System.Net.HttpStatusCode.OK,
+            locationProvider: path => path == "/" && Volatile.Read(ref rootRequests) >= 2
+                ? "/final"
+                : null,
+            bodyProvider: path => path switch
+            {
+                "/" when Interlocked.Increment(ref rootRequests) == 1 =>
+                    "<html><title>Just a moment</title><body>challenge-platform</body></html>",
+                "/final" => "<html><body><a href=\"details\">Details</a></body></html>",
+                _ => "<html><body>Fallback response</body></html>"
+            });
+        await using var fetcher = new PlaywrightContentFetcher(allowVisibleFallback: true);
+        var finalUrl = server.Url + "final";
+        var expectedLink = new Uri(new Uri(finalUrl), "details").AbsoluteUri;
+
+        // Act
+        var result = await fetcher.FetchAsAsync(
+            server.Url,
+            EContentFormat.MarkdownWithAbsoluteUrls);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.FinalUrl.Should().Be(finalUrl);
+        result.Content.Should().Contain(expectedLink);
     }
 
     [Fact]

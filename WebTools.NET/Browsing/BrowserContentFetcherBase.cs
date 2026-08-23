@@ -285,7 +285,8 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
             return new WebContent(false, errorText, $"HTTP {status}", finalUrl);
         }
 
-        var content = ContentProcessor.Process(rawBody, format, maxContentLength, sanitizeLevel);
+        var baseUrl = format == EContentFormat.MarkdownWithAbsoluteUrls ? finalUrl : null;
+        var content = ContentProcessor.Process(rawBody, format, maxContentLength, sanitizeLevel, baseUrl);
         return new WebContent(true, content, null, finalUrl);
     }
 

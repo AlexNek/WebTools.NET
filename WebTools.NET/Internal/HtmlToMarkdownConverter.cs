@@ -14,14 +14,21 @@ internal static class HtmlToMarkdownConverter
         SmartHrefHandling = true
     });
 
-    internal static string Convert(string html, ESanitizeLevel level = ESanitizeLevel.Strict)
+    internal static string Convert(
+        string html,
+        ESanitizeLevel level = ESanitizeLevel.Strict,
+        string? baseUrl = null)
     {
         if (string.IsNullOrWhiteSpace(html))
         {
             return "";
         }
 
-        var sanitized = HtmlSanitizer.RemoveNoiseTags(html, level);
-        return Converter.Convert(sanitized).Trim();
+        var resolved = HtmlSanitizer.ResolveRelativeUrls(html, baseUrl);
+        var sanitized = HtmlSanitizer.RemoveNoiseTags(resolved, level);
+        var withoutToc = level == ESanitizeLevel.None
+            ? sanitized
+            : HtmlSanitizer.RemoveFragmentOnlyLinkLists(sanitized);
+        return Converter.Convert(withoutToc).Trim();
     }
 }

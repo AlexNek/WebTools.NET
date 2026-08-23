@@ -297,4 +297,10 @@ async Task FetchDemoAsync(IWebContentFetcher fetcher, string url)
     ConsoleOutput.Ok($"fetched {content.Content.Length:N0} chars of text");
     ConsoleOutput.Detail($"final url: {content.FinalUrl}");
     ConsoleOutput.Detail($"preview  : {ConsoleOutput.Preview(content.Content)}");
+
+    var standalone = await fetcher.FetchAsAsync(url, EContentFormat.MarkdownWithAbsoluteUrls);
+    if (standalone.Success)
+    {
+        ConsoleOutput.Detail($"standalone Markdown preview: {ConsoleOutput.Preview(standalone.Content)}");
+    }
 }

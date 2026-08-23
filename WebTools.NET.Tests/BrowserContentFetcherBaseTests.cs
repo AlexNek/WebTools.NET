@@ -7,6 +7,28 @@ namespace WebTools.NET.Tests;
 public class BrowserContentFetcherBaseTests
 {
     [Fact]
+    public void CreateResult_MarkdownWithAbsoluteUrls_UsesFinalUrlAsBase()
+    {
+        // Arrange
+        var rawBody = "<a href=\"details\">Details</a>";
+        var finalUrl = "https://test.example.com/docs/";
+
+        // Act
+        var result = TestBrowserContentFetcher.CreateResult(
+            rawBody,
+            finalUrl,
+            200,
+            WebTools.NET.Models.EContentFormat.MarkdownWithAbsoluteUrls,
+            null,
+            WebTools.NET.Models.ESanitizeLevel.Strict);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.FinalUrl.Should().Be(finalUrl);
+        result.Content.Should().Contain("https://test.example.com/docs/details");
+    }
+
+    [Fact]
     public async Task DisposeAsync_WaitsForAnActiveOperationBeforeDisposingResources()
     {
         // Arrange

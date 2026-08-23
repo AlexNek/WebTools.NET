@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 
 using WebTools.NET.Browsing;
+using WebTools.NET.Models;
 
 namespace WebTools.NET.Tests;
 
@@ -13,6 +14,15 @@ public sealed class TestBrowserContentFetcher : BrowserContentFetcherBase
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public bool ResourcesDisposed { get; private set; }
+
+    public static WebContent CreateResult(
+        string rawBody,
+        string finalUrl,
+        int status,
+        EContentFormat format,
+        int? maxContentLength,
+        ESanitizeLevel sanitizeLevel) =>
+        CreateFetchResult(rawBody, finalUrl, status, format, maxContentLength, sanitizeLevel);
 
     protected override string BrowserNotInstalledMessage => "Test browser is unavailable.";
 

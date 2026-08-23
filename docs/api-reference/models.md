@@ -43,9 +43,9 @@ public sealed record WebContent(
 | Property | Description |
 | --- | --- |
 | `Success` | Whether the fetch completed successfully |
-| `Content` | Page content as plain text (HTML stripped) |
+| `Content` | Content in the representation requested by the fetch operation: plain text for `FetchAsync`, or the selected `EContentFormat` for `FetchAsAsync` |
 | `ErrorMessage` | Failure reason when `Success` is `false` |
-| `FinalUrl` | URL of the page after redirects |
+| `FinalUrl` | Browser-reported URL once page navigation and the bounded post-load observation window are complete, including observed server-side redirects and client-side navigation |
 
 ## UrlCheckResult
 
@@ -68,6 +68,6 @@ public sealed record UrlCheckResult(
 | `HttpStatus` | Final HTTP status code, when available |
 | `ErrorMessage` | Failure reason when not reachable |
 | `RedirectCount` | Number of redirects followed |
-| `FinalUrl` | URL after redirects |
+| `FinalUrl` | URL after the reachability check completes; for browser checks, this includes observed client-side navigation |
 | `ClientRedirectCount` | Number of observed main-frame client-side URL changes during the bounded browser observation window; can be greater than `1` |
 | `ProtectionType` | Detected protection type, when reported by the engine |

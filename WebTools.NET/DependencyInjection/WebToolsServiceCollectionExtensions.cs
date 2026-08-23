@@ -119,7 +119,7 @@ public static class WebToolsServiceCollectionExtensions
         BrowserAgentOptions? browserAgentOptions) =>
         AddBrowserServices(services, engine, headless, ToSessionOptions(browserAgentOptions));
 
-    private static BrowserSessionOptions? ToSessionOptions(BrowserAgentOptions? options)
+    internal static BrowserSessionOptions? ToSessionOptions(BrowserAgentOptions? options)
     {
         if (options is null)
         {
@@ -131,7 +131,7 @@ public static class WebToolsServiceCollectionExtensions
         {
             MaxOperations = nested?.MaxOperations ?? 50,
             MaxDuration = nested?.MaxDuration ?? TimeSpan.FromMinutes(5),
-            DefaultFormat = nested?.DefaultFormat ?? EContentFormat.Markdown,
+            DefaultFormat = nested?.DefaultFormat ?? options.DefaultFormat,
             IncludeScreenshot = nested?.IncludeScreenshot ?? false,
             StorageStatePath = options.StorageStatePath ?? nested?.StorageStatePath,
             ViewportWidth = nested?.ViewportWidth ?? 1920,
