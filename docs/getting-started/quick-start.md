@@ -56,7 +56,7 @@ var content = await fetcher.FetchAsync("https://test.example.com");
 if (content.Success)
 {
     Console.WriteLine(content.Content);   // plain-text page content
-    Console.WriteLine(content.FinalUrl);  // URL after redirects
+    Console.WriteLine(content.FinalUrl);  // browser URL once navigation and bounded post-load observation are complete
 }
 ```
 

@@ -164,6 +164,41 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public void LegacyOptionsMapper_PreservesTopLevelDefaultFormat()
+    {
+        // Arrange
+        var options = new BrowserAgentOptions
+        {
+            DefaultFormat = EContentFormat.MarkdownWithAbsoluteUrls
+        };
+
+        // Act
+        var mapped = WebToolsServiceCollectionExtensions.ToSessionOptions(options);
+
+        // Assert
+        mapped.Should().NotBeNull();
+        mapped!.DefaultFormat.Should().Be(EContentFormat.MarkdownWithAbsoluteUrls);
+    }
+
+    [Fact]
+    public void LegacyOptionsMapper_PrefersNestedDefaultFormat()
+    {
+        // Arrange
+        var options = new BrowserAgentOptions
+        {
+            DefaultFormat = EContentFormat.MarkdownWithAbsoluteUrls,
+            SessionOptions = new BrowserSessionOptions { DefaultFormat = EContentFormat.Html }
+        };
+
+        // Act
+        var mapped = WebToolsServiceCollectionExtensions.ToSessionOptions(options);
+
+        // Assert
+        mapped.Should().NotBeNull();
+        mapped!.DefaultFormat.Should().Be(EContentFormat.Html);
+    }
+
+    [Fact]
     public void AddBrowserServices_LegacyNullOptionsOverload_IsAccepted()
     {
         // Arrange

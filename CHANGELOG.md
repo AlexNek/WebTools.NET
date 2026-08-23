@@ -10,7 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Default Markdown conversion strips fragment-only navigation lists (e.g., MkDocs "On this page" TOC blocks) where every link is a `#anchor` and there are at least 3 items. These are navigation chrome, not content — they repeat identically across every page and waste tokens in downstream processing.
-- Adds `EContentFormat.MarkdownWithAbsoluteUrls` for standalone GitHub-flavored Markdown with relative `href` and `src` values resolved against the final browser URL, while preserving existing Markdown, Html, and PlainText behavior.
+- Adds `EContentFormat.MarkdownWithAbsoluteUrls` for standalone GitHub-flavored Markdown that converts relative `href` and `src` values from the fetched page into absolute URLs using the browser-reported URL after navigation completes, including observed redirects, while preserving existing Markdown, Html, and PlainText behavior.
+
+### Changed
+
+- Updated the API reference to document the current format-aware content-fetching contract and content representations.
+
+### Fixed
+
+- Preserves top-level `BrowserAgentOptions.DefaultFormat` through obsolete DI compatibility overloads.
 
 ## [1.3.1] - 2026-08-21
 

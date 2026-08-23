@@ -41,9 +41,29 @@ public interface IWebContentFetcher : IAsyncDisposable
 {
     Task<UrlCheckResult> CheckReachabilityAsync(string url, CancellationToken ct = default);
 
-    Task<WebContent> FetchAsync(string url, CancellationToken ct = default);
+    Task<WebContent> FetchAsync(
+        string url,
+        int? maxContentLength = null,
+        CancellationToken ct = default);
+
+    Task<WebContent> FetchAsAsync(
+        string url,
+        EContentFormat format,
+        int? maxContentLength = null,
+        ESanitizeLevel sanitizeLevel = ESanitizeLevel.Strict,
+        CancellationToken ct = default);
 }
 ```
+
+`FetchAsync` returns plain text. Here, “final URL” means the browser-reported
+URL once navigation and the browser's bounded post-load observation window are
+complete. It includes observed server-side redirects and client-side navigation.
+If no redirect or client-side navigation occurs, it is the originally requested
+URL.
+
+`FetchAsAsync` supports `PlainText`, `Markdown`, `MarkdownWithAbsoluteUrls`, and
+`Html`. In `MarkdownWithAbsoluteUrls`, relative `href` and `src` values from the
+fetched page are converted to absolute URLs using that final URL as the base.
 
 Implementations: `PlaywrightContentFetcher`, `CloakBrowserContentFetcher`.
 

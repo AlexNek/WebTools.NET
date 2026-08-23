@@ -15,7 +15,7 @@ if (!content.Success)
     return;
 }
 
-Console.WriteLine(content.FinalUrl);   // URL after any redirects
+Console.WriteLine(content.FinalUrl);   // browser URL once navigation and bounded post-load observation are complete
 Console.WriteLine(content.Content);    // page content as plain text
 ```
 
@@ -26,7 +26,7 @@ The returned `WebContent` record:
 | `Success` | Whether the fetch completed successfully |
 | `Content` | Page content extracted from the rendered body (HTML stripped) |
 | `ErrorMessage` | Failure reason when `Success` is `false` |
-| `FinalUrl` | The URL of the page after redirects |
+| `FinalUrl` | The browser-reported URL once page navigation and the bounded post-load observation window are complete, including server-side redirects and observed client-side navigation |
 
 ## Limiting Content Length
 
@@ -53,7 +53,8 @@ Use `FetchAsAsync` to control the output format:
 // Get page content as Markdown (preserves tables, headings, relative links, images)
 var md = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat.Markdown);
 
-// Get standalone Markdown with relative href/src values resolved against the final URL
+// Get standalone Markdown with relative href/src values converted to absolute URLs
+// using the URL of the page once browser navigation and bounded post-load observation are complete
 var standaloneMd = await fetcher.FetchAsAsync(
     "https://test.example.com/docs/",
     EContentFormat.MarkdownWithAbsoluteUrls);
@@ -69,10 +70,10 @@ var text = await fetcher.FetchAsAsync("https://test.example.com", EContentFormat
 | --- | --- | --- |
 | `PlainText` | Stripped text, whitespace collapsed | Token-efficient LLM input |
 | `Markdown` | GitHub-flavored Markdown with tables, headings, relative links, images | LLMs that benefit from structure when the source URL is available |
-| `MarkdownWithAbsoluteUrls` | GitHub-flavored Markdown with relative `href`/`src` values resolved against the final page URL | Standalone indexing and downstream processing |
+| `MarkdownWithAbsoluteUrls` | GitHub-flavored Markdown where relative `href`/`src` values from the fetched page are converted to absolute URLs using the browser-reported URL once navigation and the bounded post-load observation window are complete | Standalone indexing and downstream processing |
 | `Html` | Body HTML with noise tags removed | Downstream HTML processing |
 
-`MarkdownWithAbsoluteUrls` resolves relative `href` and `src` values against the final browser URL, including after redirects. Existing `Markdown` output preserves relative values. URL expansion happens before conversion and truncation, so `maxContentLength` applies to the final Markdown representation. With `ESanitizeLevel.None`, fragment-only navigation lists are preserved.
+`MarkdownWithAbsoluteUrls` converts relative `href` and `src` values from the fetched page into absolute URLs using the browser-reported URL once navigation and the browser's bounded post-load observation window are complete, including all observed server-side and client-side redirects. If no redirect or client-side navigation occurs, this is the originally requested URL. Existing `Markdown` output preserves relative values. URL expansion happens before conversion and truncation, so `maxContentLength` applies to the final Markdown representation. With `ESanitizeLevel.None`, fragment-only navigation lists are preserved.
 
 
 ```csharp
