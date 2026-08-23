@@ -79,8 +79,7 @@ internal static class HtmlSanitizer
             return;
         }
 
-        var isProtocolRelative = value.StartsWith("//", StringComparison.Ordinal);
-        if (!isProtocolRelative && Uri.TryCreate(value, UriKind.Absolute, out _))
+        if (HasExplicitUriScheme(value))
         {
             return;
         }
@@ -90,6 +89,9 @@ internal static class HtmlSanitizer
             element.SetAttribute(attributeName, absoluteUri.ToString());
         }
     }
+
+    private static bool HasExplicitUriScheme(string value) =>
+        value.IndexOf(':') > 0 && Uri.TryCreate(value, UriKind.Absolute, out _);
 
     /// <summary>
     /// Removes list elements (ul/ol) where every link is a fragment-only anchor (#...)
