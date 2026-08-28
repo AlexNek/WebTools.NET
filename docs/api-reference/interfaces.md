@@ -67,6 +67,22 @@ fetched page are converted to absolute URLs using that final URL as the base.
 
 Implementations: `PlaywrightContentFetcher`, `CloakBrowserContentFetcher`.
 
+## IHtmlContentAnalyzer
+
+Browser-independent analysis of a complete HTML document. The implementation is provided by the `WebTools.NET.ContentAnalysis` companion package and is registered by `AddWebToolsCore()`.
+
+```csharp
+public interface IHtmlContentAnalyzer
+{
+    HtmlAnalysisResult Analyze(
+        string html,
+        HtmlAnalysisOptions? options = null,
+        Uri? sourceUri = null);
+}
+```
+
+Use `IBrowserContent.GetHtmlAsync()` when analyzing the complete current browser document. The analyzer does not create or own browser resources.
+
 ## IBrowserInteraction
 
 Low-level browser session control. Extends `IAsyncDisposable`.

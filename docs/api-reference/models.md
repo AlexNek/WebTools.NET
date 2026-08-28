@@ -47,7 +47,12 @@ public sealed record WebContent(
 | `ErrorMessage` | Failure reason when `Success` is `false` |
 | `FinalUrl` | Browser-reported URL once page navigation and the bounded post-load observation window are complete, including observed server-side redirects and client-side navigation |
 
-## UrlCheckResult
+## HtmlAnalysisResult and related models
+
+`HtmlAnalysisResult` contains bounded extracted text blocks, structured-data records, ranked candidate regions, and truncation/omission metadata. The companion package also provides `HtmlAnalysisOptions`, `HtmlTextBlock`, `HtmlCandidateRegion`, `HtmlStructuredDataRecord`, and `HtmlSourceLocation`.
+
+Pass complete HTML to `IHtmlContentAnalyzer`. Structured data is inspected before configured noise is removed, and malformed structured data does not prevent ordinary text extraction.
+
 
 Outcome of a URL reachability check.
 

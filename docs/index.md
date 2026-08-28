@@ -14,6 +14,7 @@ engines.
 | --- | --- | --- |
 | Web search | `WebSearchService`, `IWebSearchProvider` | Search the web via DuckDuckGo (HTTP) or browser-based providers |
 | Content fetching | `IWebContentFetcher` | Retrieve rendered page content through headless browsers |
+| HTML content analysis | `IHtmlContentAnalyzer` | Extract structured content and bounded ranked candidates from complete HTML |
 | URL reachability | `IWebAccessService` | Plain-HTTP reachability checks with redirect tracking |
 | Navigation | `WebNavigationService` | Same-host link extraction and navigation |
 | Browser session | `BrowserSession` | Caller-controlled stateful browser operations and snapshots |

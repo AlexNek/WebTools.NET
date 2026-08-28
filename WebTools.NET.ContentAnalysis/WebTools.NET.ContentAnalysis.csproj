@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>WebTools.NET.ContentAnalysis</RootNamespace>
+    <AssemblyName>WebTools.NET.ContentAnalysis</AssemblyName>
+
+    <PackageId>WebTools.NET.ContentAnalysis</PackageId>
+    <Title>WebTools.NET HTML Content Analysis</Title>
+    <Description>Deterministic HTML content extraction, structured-data inspection, and bounded candidate analysis.</Description>
+    <Authors>Alex Nek</Authors>
+    <PackageTags>web;html;content;analysis;structured-data</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <RepositoryUrl>https://github.com/AlexNek/WebTools.NET</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/AlexNek/WebTools.NET</PackageProjectUrl>
+
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <PackageReference Include="AngleSharp" Version="1.5.2" />
+  </ItemGroup>
+
+</Project>

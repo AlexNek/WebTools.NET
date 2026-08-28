@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using WebTools.NET;
 using WebTools.NET.Abstractions;
 using WebTools.NET.Browsing;
+using WebTools.NET.ContentAnalysis.Abstractions;
+using WebTools.NET.ContentAnalysis.Analysis;
 using WebTools.NET.Models;
 using WebTools.NET.Search;
 
@@ -147,6 +149,7 @@ public static class WebToolsServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton<IWebAccessService, WebAccessService>();
+        services.TryAddSingleton<IHtmlContentAnalyzer, HtmlContentAnalyzer>();
 
         return services;
     }

@@ -287,3 +287,15 @@ See [CHANGELOG.md](https://github.com/AlexNek/WebTools.NET/blob/master/CHANGELOG
 ## License
 
 MIT – see [LICENSE.txt](https://github.com/AlexNek/WebTools.NET/blob/master/LICENSE.txt) for details.
+
+### Analyze complete HTML documents
+
+The `WebTools.NET.ContentAnalysis` companion package extracts structured text and bounded ranked candidates from complete HTML documents:
+
+```csharp
+var analyzer = provider.GetRequiredService<IHtmlContentAnalyzer>();
+var html = await browser.GetHtmlAsync();
+var result = analyzer.Analyze(html, sourceUri: new Uri(await browser.GetCurrentUrlAsync()));
+```
+
+The analyzer inspects JSON-LD, metadata, application state, and useful `data-*` attributes before removing configured noise. It is independent of browser lifecycle and can also be used directly with local HTML strings.
