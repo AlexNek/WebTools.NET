@@ -1,6 +1,6 @@
 # Core Interfaces
 
-All interfaces live in the `WebTools.NET.Abstractions` namespace.
+The core WebTools.NET interfaces live in the `WebTools.NET.Abstractions` namespace. The HTML content-analysis interface belongs to the companion package and is declared in `WebTools.NET.ContentAnalysis.Abstractions`.
 
 ## IWebAccessService
 
@@ -66,6 +66,22 @@ URL.
 fetched page are converted to absolute URLs using that final URL as the base.
 
 Implementations: `PlaywrightContentFetcher`, `CloakBrowserContentFetcher`.
+
+## IHtmlContentAnalyzer
+
+Browser-independent analysis of a complete HTML document. The implementation is provided by the `WebTools.NET.ContentAnalysis` companion package and is registered by `AddWebToolsCore()`.
+
+```csharp
+public interface IHtmlContentAnalyzer
+{
+    HtmlAnalysisResult Analyze(
+        string html,
+        HtmlAnalysisOptions? options = null,
+        Uri? sourceUri = null);
+}
+```
+
+Use `IBrowserContent.GetHtmlAsync()` when analyzing the complete current browser document. The analyzer does not create or own browser resources.
 
 ## IBrowserInteraction
 

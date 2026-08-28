@@ -15,6 +15,7 @@ Registers the HTTP-only core services:
 | Service | Implementation | Lifetime |
 | --- | --- | --- |
 | `IWebAccessService` | `WebAccessService` | Singleton |
+| `IHtmlContentAnalyzer` | `HtmlContentAnalyzer` | Singleton |
 
 Throws `ArgumentNullException` when `services` is null.
 

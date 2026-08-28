@@ -9,6 +9,7 @@ on:
 env:
   DOTNET_VERSION: '10.0.x'
   TEST_PATH: WebTools.NET.Tests/WebTools.NET.Tests.csproj
+  CONTENT_ANALYSIS_TEST_PATH: WebTools.NET.ContentAnalysis.Tests/WebTools.NET.ContentAnalysis.Tests.csproj
 
 jobs:
   build-and-test:
@@ -32,6 +33,9 @@ jobs:
 
       - name: Test
         run: dotnet test ${{ env.TEST_PATH }} --configuration Release --no-build --verbosity normal --filter "Category!=Integration"
+
+      - name: Test HTML content analysis
+        run: dotnet test ${{ env.CONTENT_ANALYSIS_TEST_PATH }} --configuration Release --no-build --verbosity normal
 
   browser-integration:
     runs-on: ubuntu-latest

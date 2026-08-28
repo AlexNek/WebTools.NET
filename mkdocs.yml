@@ -51,6 +51,8 @@ nav:
       - Overview: search/overview.md
       - Search Providers: search/providers.md
       - WebSearchService: search/web-search-service.md
+  - Content Analysis:
+      - Overview: content-analysis/overview.md
   - Content Fetching:
       - Overview: content-fetching/overview.md
       - URL Reachability: content-fetching/url-reachability.md

@@ -4,22 +4,28 @@
 
 ```
 WebTools.NET_private/
-├── WebTools.NET/            (main library — NuGet package)
-├── WebTools.NET.Demo/       (demo console app)
-├── WebTools.NET.Tests/      (unit tests)
-└── WebTools.NET.sln
+├── WebTools.NET/                       (main library — NuGet package)
+├── WebTools.NET.ContentAnalysis/       (HTML analysis library — NuGet package)
+├── WebTools.NET.Demo/                  (demo console app)
+├── WebTools.NET.Tests/                 (WebTools.NET unit tests)
+├── WebTools.NET.ContentAnalysis.Tests/ (HTML analysis unit tests)
+└── WebTools.NET.slnx
 ```
 
 ## Layer Dependency Direction (strict one-way)
 
 ```
-WebTools.NET.Demo   →  WebTools.NET  ←  WebTools.NET.Tests
-                        (library)
+WebTools.NET.Demo       → WebTools.NET → WebTools.NET.ContentAnalysis
+WebTools.NET.Tests      → WebTools.NET
+                         → WebTools.NET.ContentAnalysis
+WebTools.NET.ContentAnalysis.Tests → WebTools.NET.ContentAnalysis
 ```
 
-- **WebTools.NET** — abstractions, models, service implementations, search providers, browser wrappers. This is the published NuGet package.
-- **WebTools.NET.Demo** — references WebTools.NET. Demonstrates all library features. Not published.
-- **WebTools.NET.Tests** — references WebTools.NET. Unit tests only. Not published.
+- **WebTools.NET** — browser, navigation, search, and integration services. This is the main published NuGet package.
+- **WebTools.NET.ContentAnalysis** — browser-independent HTML parsing and analysis. This is a companion NuGet package.
+- **WebTools.NET.Demo** — references WebTools.NET. Demonstrates library features. Not published.
+- **WebTools.NET.Tests** — references WebTools.NET. Tests the main package and its integration points.
+- **WebTools.NET.ContentAnalysis.Tests** — references WebTools.NET.ContentAnalysis. Hermetic HTML-analysis tests.
 
 ## Forbidden in WebTools.NET.Demo
 

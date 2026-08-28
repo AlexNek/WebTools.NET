@@ -30,7 +30,9 @@ permissions:
 env:
   DOTNET_VERSION: '10.0.x'
   PROJECT_PATH: WebTools.NET/WebTools.NET.csproj
+  CONTENT_ANALYSIS_PROJECT_PATH: WebTools.NET.ContentAnalysis/WebTools.NET.ContentAnalysis.csproj
   TEST_PATH: WebTools.NET.Tests/WebTools.NET.Tests.csproj
+  CONTENT_ANALYSIS_TEST_PATH: WebTools.NET.ContentAnalysis.Tests/WebTools.NET.ContentAnalysis.Tests.csproj
 
 jobs:
   build-and-test:
@@ -85,8 +87,14 @@ jobs:
       - name: Test
         run: dotnet test ${{ env.TEST_PATH }} --configuration Release --no-build --verbosity normal --filter "Category!=Integration"
 
-      - name: Pack
+      - name: Test HTML content analysis
+        run: dotnet test ${{ env.CONTENT_ANALYSIS_TEST_PATH }} --configuration Release --no-build --verbosity normal
+
+      - name: Pack WebTools.NET
         run: dotnet pack ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./nupkg /p:PackageVersion=${{ steps.version.outputs.value }}
+
+      - name: Pack WebTools.NET.ContentAnalysis
+        run: dotnet pack ${{ env.CONTENT_ANALYSIS_PROJECT_PATH }} --configuration Release --no-build --output ./nupkg /p:PackageVersion=${{ steps.version.outputs.value }}
 
       - name: Upload NuGet artifact
         uses: actions/upload-artifact@v6

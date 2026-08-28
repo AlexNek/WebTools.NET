@@ -12,6 +12,7 @@ services.AddWebToolsCore();
 | Registered service | Implementation |
 | --- | --- |
 | `IWebAccessService` | `WebAccessService` |
+| `IHtmlContentAnalyzer` | `HtmlContentAnalyzer` |
 
 No browser is required for this registration.
 
