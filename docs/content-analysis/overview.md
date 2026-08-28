@@ -1,6 +1,6 @@
 # HTML Content Analysis
 
-`WebTools.NET.ContentAnalysis` analyzes complete HTML documents without a browser or network connection. It extracts meaningful text, inspects embedded structured data, detects relevant signals, and returns bounded ranked candidate regions.
+`WebTools.NET.ContentAnalysis` analyzes complete HTML documents without a browser or network connection. It extracts meaningful text, inspects embedded structured data, detects configurable signals, and returns bounded ranked candidate regions. It has no built-in topic such as pricing; callers provide the keywords, structural tokens, and signal weights relevant to their application.
 
 ## Installation
 
@@ -15,7 +15,16 @@ dotnet add package WebTools.NET.ContentAnalysis
 Resolve `IHtmlContentAnalyzer` from dependency injection or construct `HtmlContentAnalyzer` directly:
 
 ```csharp
-var result = analyzer.Analyze(html, sourceUri: new Uri("https://test.example.com/pricing"));
+var options = new HtmlAnalysisOptions
+{
+    CandidateKeywords = ["release", "migration"],
+    StructuralTokens = ["article", "guide"]
+};
+
+var result = analyzer.Analyze(
+    html,
+    options,
+    sourceUri: new Uri("https://test.example.com/docs"));
 
 foreach (var candidate in result.CandidateRegions)
 {
@@ -45,4 +54,4 @@ var result = analyzer.Analyze(html, sourceUri: new Uri(await browser.GetCurrentU
 - ranked, bounded `CandidateRegions` with signals, scores, context, and source locations;
 - `Metadata` describing input/result truncation and diagnostics.
 
-Use `HtmlAnalysisOptions` to limit input size, structured-data payloads, text blocks, candidates, fragment length, and nearby context. Ranking is deterministic: higher scores rank first, followed by document order.
+Use `HtmlAnalysisOptions` to configure candidate keywords, structural tokens, and signal weights, as well as input size, structured-data payloads, text blocks, candidates, fragment length, and nearby context. With the default weights, generic numeric, currency, time-period, and repeated-structure evidence is available without selecting a topic. Ranking is deterministic: higher scores rank first, followed by document order.

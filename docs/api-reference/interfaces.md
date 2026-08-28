@@ -1,6 +1,6 @@
 # Core Interfaces
 
-All interfaces live in the `WebTools.NET.Abstractions` namespace.
+The core WebTools.NET interfaces live in the `WebTools.NET.Abstractions` namespace. The HTML content-analysis interface belongs to the companion package and is declared in `WebTools.NET.ContentAnalysis.Abstractions`.
 
 ## IWebAccessService
 

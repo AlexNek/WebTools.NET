@@ -1,7 +1,10 @@
 # Models
 
-All result models are immutable records in the `WebTools.NET.Models`
+Search and fetch result models are immutable records in the `WebTools.NET.Models`
 namespace.
+
+HTML content-analysis models are provided by the companion package in the
+`WebTools.NET.ContentAnalysis.Models` namespace.
 
 ## SearchResult
 
@@ -51,7 +54,7 @@ public sealed record WebContent(
 
 `HtmlAnalysisResult` contains bounded extracted text blocks, structured-data records, ranked candidate regions, and truncation/omission metadata. The companion package also provides `HtmlAnalysisOptions`, `HtmlTextBlock`, `HtmlCandidateRegion`, `HtmlStructuredDataRecord`, and `HtmlSourceLocation`.
 
-Pass complete HTML to `IHtmlContentAnalyzer`. Structured data is inspected before configured noise is removed, and malformed structured data does not prevent ordinary text extraction.
+Pass complete HTML to `IHtmlContentAnalyzer`. Structured data is inspected before configured noise is removed, and malformed structured data does not prevent ordinary text extraction. Candidate detection is topic-neutral by default; configure `HtmlAnalysisOptions.CandidateKeywords`, `StructuralTokens`, and `SignalWeights` for the consumer's relevance profile.
 
 
 Outcome of a URL reachability check.

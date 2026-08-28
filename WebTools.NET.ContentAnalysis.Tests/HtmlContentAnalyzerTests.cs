@@ -124,6 +124,23 @@ public class HtmlContentAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_ReportsTruncatedStructuredDataInResultMetadata()
+    {
+        // Arrange
+        const string html = "<script type='application/ld+json'>{\"@type\":\"Product\",\"name\":\"Pro\"}</script>";
+        var analyzer = new HtmlContentAnalyzer();
+        var options = new HtmlAnalysisOptions { MaxStructuredDataPayloadLength = 10 };
+
+        // Act
+        var result = analyzer.Analyze(html, options);
+
+        // Assert
+        result.StructuredData.Should().ContainSingle(record => record.IsTruncated);
+        result.Metadata.ResultsTruncated.Should().BeTrue();
+        result.Metadata.OmittedStructuredDataRecords.Should().Be(0);
+    }
+
+    [Fact]
     public void Analyze_RejectsNonPositiveLimits()
     {
         // Arrange

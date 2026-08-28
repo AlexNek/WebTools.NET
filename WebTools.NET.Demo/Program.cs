@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 using WebTools.NET;
 using WebTools.NET.Abstractions;
+using WebTools.NET.Browsing;
+using WebTools.NET.ContentAnalysis.Abstractions;
 using WebTools.NET.Demo;
 using WebTools.NET.Geo;
 using WebTools.NET.Models;
@@ -87,6 +89,8 @@ await using var sp = services.BuildServiceProvider();
 var fetcher = sp.GetRequiredService<IWebContentFetcher>();
 var search = sp.GetRequiredService<IWebSearchProvider>();
 var browser = sp.GetRequiredService<IBrowserInteraction>();
+var browserContent = sp.GetRequiredService<IBrowserContent>();
+var analyzer = sp.GetRequiredService<IHtmlContentAnalyzer>();
 
 await runner.RunSectionAsync(
     "Dependency injection (AddWebToolsCore + AddBrowserServices)",
@@ -97,6 +101,7 @@ await runner.RunSectionAsync(
         ConsoleOutput.Info("IWebContentFetcher", fetcher.GetType().Name);
         ConsoleOutput.Info("IWebSearchProvider", search.GetType().Name);
         ConsoleOutput.Info("IBrowserInteraction", browser.GetType().Name);
+        ConsoleOutput.Info("IHtmlContentAnalyzer", analyzer.GetType().Name);
         ConsoleOutput.Ok("all services resolved for engine: Playwright");
         return Task.CompletedTask;
     });
@@ -195,6 +200,11 @@ await runner.RunSectionAsync(
         var text = await browser.GetContentAsync();
         ConsoleOutput.Detail($"page text    : {text.Length:N0} chars");
         ConsoleOutput.Detail($"preview      : {ConsoleOutput.Preview(text)}");
+
+        var analysis = await browserContent.AnalyzeCurrentPageAsync(analyzer);
+        ConsoleOutput.Ok($"analysis     : {analysis.TextBlocks.Count} text block(s), " +
+                         $"{analysis.StructuredData.Count} structured record(s), " +
+                         $"{analysis.CandidateRegions.Count} candidate region(s)");
     });
 
 // ---------------------------------------------------------------------
