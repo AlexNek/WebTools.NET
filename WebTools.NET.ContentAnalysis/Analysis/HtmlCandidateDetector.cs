@@ -53,12 +53,33 @@ internal sealed class HtmlCandidateDetector
         return candidates;
     }
 
+    private static IEnumerable<string> GetRepeatedKeys(IElement element)
+    {
+        var classAttribute = element.GetAttribute("class");
+        if (!string.IsNullOrWhiteSpace(classAttribute))
+        {
+            foreach (var classToken in classAttribute.Split(
+                         (char[]?)null,
+                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                yield return $"class:{classToken}";
+            }
+        }
+
+        var id = element.GetAttribute("id")?.Trim();
+        if (!string.IsNullOrWhiteSpace(id))
+        {
+            yield return $"id:{id}";
+        }
+    }
+
     private static HashSet<string> FindRepeatedKeys(
         IReadOnlyList<(IElement Element, HtmlTextBlock Block)> blocks)
     {
         return blocks
             .SelectMany(entry => GetElementAndContainerAncestors(entry.Element)
-                .Select(element => (Element: element, Key: HtmlElementMetadata.GetClassAndIdValue(element).Trim())))
+                .SelectMany(element => GetRepeatedKeys(element)
+                    .Select(key => (Element: element, Key: key))))
             .Where(item => !string.IsNullOrWhiteSpace(item.Key))
             .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Select(item => item.Element).Distinct().Count() > 1)
@@ -77,9 +98,7 @@ internal sealed class HtmlCandidateDetector
             .Select(HtmlElementMetadata.GetClassAndIdValue)
             .Any(value => ContainsConfiguredToken(value, options.StructuralTokens));
         var repeated = GetElementAndContainerAncestors(entry.Element)
-            .Select(HtmlElementMetadata.GetClassAndIdValue)
-            .Select(value => value.Trim())
-            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .SelectMany(GetRepeatedKeys)
             .Any(repeatedKeys.Contains);
 
         var signals = new List<string>();

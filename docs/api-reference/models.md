@@ -54,7 +54,7 @@ public sealed record WebContent(
 
 `HtmlAnalysisResult` contains bounded extracted text blocks, structured-data records, ranked candidate regions, and truncation/omission metadata. The companion package also provides `HtmlAnalysisOptions`, `HtmlTextBlock`, `HtmlCandidateRegion`, `HtmlStructuredDataRecord`, and `HtmlSourceLocation`.
 
-Pass complete HTML to `IHtmlContentAnalyzer`. Structured data is inspected before configured noise is removed, and malformed structured data does not prevent ordinary text extraction. Candidate detection is topic-neutral by default; configure `HtmlAnalysisOptions.CandidateKeywords`, `StructuralTokens`, and `SignalWeights` for the consumer's relevance profile.
+Pass complete HTML to `IHtmlContentAnalyzer`. Structured data is inspected before configured noise is removed, and malformed structured data does not prevent ordinary text extraction. Candidate detection is topic-neutral by default; configure `HtmlAnalysisOptions.CandidateKeywords`, `StructuralTokens`, and `SignalWeights` for the consumer's relevance profile. For invalid inputs, `Analyze` preserves `ArgumentNullException` for null HTML and `ArgumentOutOfRangeException` for non-positive analysis limits.
 
 
 Outcome of a URL reachability check.

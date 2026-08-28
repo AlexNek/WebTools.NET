@@ -36,8 +36,10 @@ graph LR
     F --> I[PlaywrightSession / CloakBrowserSession]
 ```
 
-Every operation returns a result object (`SearchResult`, `WebContent`,
-`UrlCheckResult`) instead of throwing — see
+Most operations return a result object (`SearchResult`, `WebContent`,
+`UrlCheckResult`) instead of throwing. `IHtmlContentAnalyzer` is the exception:
+its `Analyze` method preserves `ArgumentNullException` for null HTML and
+`ArgumentOutOfRangeException` for invalid analysis limits — see
 [Error Handling](concepts/error-handling.md).
 
 ## Where to Start

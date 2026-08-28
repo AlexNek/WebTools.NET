@@ -141,6 +141,29 @@ public class HtmlContentAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_GroupsContainersBySharedClassTokenDespiteDifferentIds()
+    {
+        // Arrange
+        const string html = "<body>" +
+                            "<section class='shared-card' id='first'><p>Alpha</p></section>" +
+                            "<section class='SHARED-CARD' id='second'><p>Beta</p></section>" +
+                            "</body>";
+        var options = new HtmlAnalysisOptions
+        {
+            SignalWeights = new Dictionary<string, double> { ["repeated"] = 1d }
+        };
+        var analyzer = new HtmlContentAnalyzer();
+
+        // Act
+        var result = analyzer.Analyze(html, options);
+
+        // Assert
+        result.CandidateRegions.Should().HaveCount(2);
+        result.CandidateRegions.Select(candidate => candidate.Text)
+            .Should().Contain("Alpha").And.Contain("Beta");
+    }
+
+    [Fact]
     public void Analyze_RejectsNonPositiveLimits()
     {
         // Arrange
