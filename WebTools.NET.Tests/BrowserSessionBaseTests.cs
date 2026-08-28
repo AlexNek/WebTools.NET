@@ -16,7 +16,8 @@ public class BrowserSessionBaseTests
         await using var sut = new PlaywrightSession();
 
         // Act
-        var act = () => sut.ScreenshotAsync((EScreenshotScope)99);
+        var act = () => sut.ScreenshotAsync(
+            (EScreenshotScope)99, CancellationToken.None);
 
         // Assert
         var exception = await act.Should().ThrowAsync<ArgumentOutOfRangeException>();

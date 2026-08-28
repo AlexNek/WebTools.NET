@@ -100,6 +100,15 @@ var viewportScreenshot = await session.ScreenshotAsync();
 var fullPageScreenshot = await session.ScreenshotAsync(EScreenshotScope.FullPage);
 ```
 
+The scope-first overload keeps `ScreenshotAsync()` on the default viewport and
+allows direct full-page capture. If you pass a cancellation token, use the
+named argument because positional `ScreenshotAsync(cancellationToken)` is no
+longer supported:
+
+```csharp
+var screenshot = await browser.ScreenshotAsync(ct: cancellationToken);
+```
+
 When `BrowserSessionOptions.IncludeScreenshot` is enabled, snapshots use
 `DefaultScreenshotScope`, which defaults to `EScreenshotScope.Viewport`.
 

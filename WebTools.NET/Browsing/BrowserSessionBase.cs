@@ -525,11 +525,8 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
         }
     }
 
-    public Task<string> ScreenshotAsync(CancellationToken ct = default) =>
-        ScreenshotAsync(EScreenshotScope.Viewport, ct);
-
     public async Task<string> ScreenshotAsync(
-        EScreenshotScope scope,
+        EScreenshotScope scope = EScreenshotScope.Viewport,
         CancellationToken ct = default)
     {
         if (scope != EScreenshotScope.Viewport && scope != EScreenshotScope.FullPage)

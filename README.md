@@ -197,6 +197,9 @@ snapshot = await browserSession.ExecuteAsync(new BrowserOperation(
 // Direct screenshots default to the viewport; use EScreenshotScope.FullPage
 // when the complete scrollable page is required.
 var fullPageScreenshot = await session.ScreenshotAsync(EScreenshotScope.FullPage);
+// If passing a cancellation token, use the named argument because positional
+// ScreenshotAsync(cancellationToken) is no longer supported.
+var screenshot = await session.ScreenshotAsync(ct: cancellationToken);
 ```
 
 Operations: Navigate, Click, Fill, FillForm, Select, Submit, ScrollDown, ScrollUp,

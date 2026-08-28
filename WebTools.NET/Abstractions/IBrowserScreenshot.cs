@@ -7,7 +7,7 @@ namespace WebTools.NET.Abstractions;
 /// </summary>
 public interface IBrowserScreenshot
 {
-    Task<string> ScreenshotAsync(CancellationToken ct = default);
-
-    Task<string> ScreenshotAsync(EScreenshotScope scope, CancellationToken ct = default);
+    Task<string> ScreenshotAsync(
+        EScreenshotScope scope = EScreenshotScope.Viewport,
+        CancellationToken ct = default);
 }

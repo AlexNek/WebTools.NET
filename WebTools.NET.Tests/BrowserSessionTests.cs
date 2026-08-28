@@ -617,7 +617,7 @@ public class BrowserSessionTests
     {
         // Arrange
         var browser = CreateBrowser();
-        browser.ScreenshotAsync(Arg.Any<CancellationToken>())
+        browser.ScreenshotAsync(Arg.Any<EScreenshotScope>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<string>(new InvalidOperationException("Screenshot unavailable.")));
         await using var sut = new BrowserSession(
             browser,
@@ -633,11 +633,11 @@ public class BrowserSessionTests
     }
 
     [Fact]
-    public async Task StartAsync_WhenScreenshotScopeDefaultsToViewport_UsesTokenOnlyScreenshot()
+    public async Task StartAsync_WhenScreenshotScopeDefaultsToViewport_UsesViewportScreenshot()
     {
         // Arrange
         var browser = CreateBrowser();
-        browser.ScreenshotAsync(Arg.Any<CancellationToken>())
+        browser.ScreenshotAsync(EScreenshotScope.Viewport, Arg.Any<CancellationToken>())
             .Returns("viewport-image");
         await using var sut = new BrowserSession(
             browser,
@@ -648,9 +648,8 @@ public class BrowserSessionTests
 
         // Assert
         snapshot.ScreenshotBase64.Should().Be("viewport-image");
-        await browser.Received(1).ScreenshotAsync(Arg.Any<CancellationToken>());
-        await browser.DidNotReceive().ScreenshotAsync(
-            Arg.Any<EScreenshotScope>(), Arg.Any<CancellationToken>());
+        await browser.Received(1).ScreenshotAsync(
+            EScreenshotScope.Viewport, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -675,7 +674,6 @@ public class BrowserSessionTests
         snapshot.ScreenshotBase64.Should().Be("full-page-image");
         await browser.Received(1).ScreenshotAsync(
             EScreenshotScope.FullPage, Arg.Any<CancellationToken>());
-        await browser.DidNotReceive().ScreenshotAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

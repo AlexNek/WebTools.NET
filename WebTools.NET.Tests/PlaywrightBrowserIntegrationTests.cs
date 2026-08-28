@@ -28,9 +28,11 @@ public class PlaywrightBrowserIntegrationTests
         await session.NavigateAsync(server.Url);
 
         // Act
-        var viewportScreenshot = await session.ScreenshotAsync(EScreenshotScope.Viewport);
+        var viewportScreenshot = await session.ScreenshotAsync(
+            EScreenshotScope.Viewport, CancellationToken.None);
         var legacyScreenshot = await session.ScreenshotAsync();
-        var fullPageScreenshot = await session.ScreenshotAsync(EScreenshotScope.FullPage);
+        var fullPageScreenshot = await session.ScreenshotAsync(
+            EScreenshotScope.FullPage, CancellationToken.None);
 
         // Assert
         var viewportHeight = ReadPngHeight(viewportScreenshot);

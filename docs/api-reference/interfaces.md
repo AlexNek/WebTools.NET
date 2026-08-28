@@ -123,13 +123,21 @@ public interface IBrowserSession : IBrowserInteraction
     Task<bool> HasMoreContentAsync(CancellationToken ct = default);
     Task LoadStorageStateAsync(string path, CancellationToken ct = default);
     Task SaveStorageStateAsync(string path, CancellationToken ct = default);
-    Task<string> ScreenshotAsync(CancellationToken ct = default);
-    Task<string> ScreenshotAsync(EScreenshotScope scope, CancellationToken ct = default);
+    Task<string> ScreenshotAsync(EScreenshotScope scope = EScreenshotScope.Viewport, CancellationToken ct = default);
     Task ScrollAsync(int deltaY, CancellationToken ct = default);
     Task SelectOptionAsync(string selector, string value, CancellationToken ct = default);
     Task SubmitFormAsync(string selector, CancellationToken ct = default);
     Task WaitForSelectorAsync(string selector, int timeoutMs, CancellationToken ct = default);
 }
+```
+
+The scope-first overload keeps `ScreenshotAsync()` on the default viewport and
+allows direct full-page capture. If you pass a cancellation token, use the
+named argument because positional `ScreenshotAsync(cancellationToken)` is no
+longer supported:
+
+```csharp
+var screenshot = await session.ScreenshotAsync(ct: cancellationToken);
 ```
 
 Implementations: `PlaywrightSession`, `CloakBrowserSession`.
