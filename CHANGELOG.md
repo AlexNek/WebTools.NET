@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-28
+
 ### Added
 
 - Reusable complete-HTML analysis through the `WebTools.NET.ContentAnalysis` companion package, including structured-data inspection, semantic text and link extraction, configurable topic-neutral candidate detection, read-only bounded results with truncation and omission metadata, and browser current-page composition.
