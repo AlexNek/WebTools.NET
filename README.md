@@ -170,6 +170,7 @@ using WebTools.NET.Models;
 var options = new BrowserSessionOptions
 {
     IncludeScreenshot = false,
+    DefaultScreenshotScope = EScreenshotScope.Viewport,
     StorageStatePath = "./cookies.json"
 };
 var sessionFactory = new BrowserSessionFactory(
@@ -192,6 +193,10 @@ snapshot = await browserSession.ExecuteAsync(new BrowserOperation(
     EBrowserOperationType.Click, ElementIndex: 4));
 
 // snapshot.Url, snapshot.Content, snapshot.Elements are now the dashboard
+
+// Direct screenshots default to the viewport; use EScreenshotScope.FullPage
+// when the complete scrollable page is required.
+var fullPageScreenshot = await session.ScreenshotAsync(EScreenshotScope.FullPage);
 ```
 
 Operations: Navigate, Click, Fill, FillForm, Select, Submit, ScrollDown, ScrollUp,

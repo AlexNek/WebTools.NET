@@ -1,3 +1,5 @@
+using WebTools.NET.Models;
+
 namespace WebTools.NET.Abstractions;
 
 /// <summary>
@@ -6,4 +8,6 @@ namespace WebTools.NET.Abstractions;
 public interface IBrowserScreenshot
 {
     Task<string> ScreenshotAsync(CancellationToken ct = default);
+
+    Task<string> ScreenshotAsync(EScreenshotScope scope, CancellationToken ct = default);
 }

@@ -58,6 +58,7 @@ public sealed class BrowserAgent : IAsyncDisposable
             MaxDuration = nested?.MaxDuration ?? options.MaxDuration,
             DefaultFormat = nested?.DefaultFormat ?? options.DefaultFormat,
             IncludeScreenshot = nested?.IncludeScreenshot ?? options.IncludeScreenshot,
+            DefaultScreenshotScope = nested?.DefaultScreenshotScope ?? EScreenshotScope.Viewport,
             StorageStatePath = nested?.StorageStatePath ?? options.StorageStatePath,
             ViewportWidth = nested?.ViewportWidth ?? 1920,
             ViewportHeight = nested?.ViewportHeight ?? 1080

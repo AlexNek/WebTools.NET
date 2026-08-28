@@ -124,6 +124,7 @@ public interface IBrowserSession : IBrowserInteraction
     Task LoadStorageStateAsync(string path, CancellationToken ct = default);
     Task SaveStorageStateAsync(string path, CancellationToken ct = default);
     Task<string> ScreenshotAsync(CancellationToken ct = default);
+    Task<string> ScreenshotAsync(EScreenshotScope scope, CancellationToken ct = default);
     Task ScrollAsync(int deltaY, CancellationToken ct = default);
     Task SelectOptionAsync(string selector, string value, CancellationToken ct = default);
     Task SubmitFormAsync(string selector, CancellationToken ct = default);
@@ -186,10 +187,11 @@ public interface IBrowserSessionState
 orchestration wrapper. `ViewportWidth` and `ViewportHeight` are engine-session
 options that must reach `PlaywrightSession` or `CloakBrowserSession` (directly or
 through `IBrowserSessionFactory`). `MaxOperations`, `MaxDuration`,
-`DefaultFormat`, and `IncludeScreenshot` are orchestration options consumed by
-`BrowserSession`; pass the options object when constructing that wrapper.
-`StorageStatePath` is used by both layers when storage persistence is enabled.
-The default viewport is 1920×1080.
+`DefaultFormat`, `IncludeScreenshot`, and `DefaultScreenshotScope` are
+orchestration options consumed by `BrowserSession`; pass the options object when
+constructing that wrapper. `DefaultScreenshotScope` defaults to `Viewport` and
+controls screenshots included in snapshots. `StorageStatePath` is used by both
+layers when storage persistence is enabled. The default viewport is 1920×1080.
 
 ## IGeoRegionProvider
 

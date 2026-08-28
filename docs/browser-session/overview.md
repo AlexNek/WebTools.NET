@@ -90,12 +90,28 @@ Failures are normally reported in `BrowserSnapshot.Error` while preserving the
 last usable page state. Caller cancellation remains cancellation and is not
 converted into a normal operation error.
 
+## Screenshots
+
+Direct screenshots use the visible viewport by default. Pass
+`EScreenshotScope.FullPage` to capture the full scrollable page:
+
+```csharp
+var viewportScreenshot = await session.ScreenshotAsync();
+var fullPageScreenshot = await session.ScreenshotAsync(EScreenshotScope.FullPage);
+```
+
+When `BrowserSessionOptions.IncludeScreenshot` is enabled, snapshots use
+`DefaultScreenshotScope`, which defaults to `EScreenshotScope.Viewport`.
+
 ## Limits and persistence
 
 `BrowserSessionOptions` configures the maximum operation count, maximum session
-duration, output format, screenshot inclusion, storage-state path, and viewport.
-Storage state is loaded before the first navigation and saved by the wrapper
-when configured; the browser session itself remains caller-owned.
+duration, output format, screenshot inclusion and scope, storage-state path,
+and viewport. `DefaultScreenshotScope` defaults to `EScreenshotScope.Viewport`;
+set it to `EScreenshotScope.FullPage` when opt-in snapshot screenshots should
+include the full scrollable page. Storage state is loaded before the first
+navigation and saved by the wrapper when configured; the browser session itself
+remains caller-owned.
 
 Built-in browser sessions serialize page operations, reset, and disposal through
 a lifecycle gate. If a session deadline interrupts an in-flight operation, a

@@ -135,6 +135,7 @@ public static class WebToolsServiceCollectionExtensions
             MaxDuration = nested?.MaxDuration ?? TimeSpan.FromMinutes(5),
             DefaultFormat = nested?.DefaultFormat ?? options.DefaultFormat,
             IncludeScreenshot = nested?.IncludeScreenshot ?? false,
+            DefaultScreenshotScope = nested?.DefaultScreenshotScope ?? EScreenshotScope.Viewport,
             StorageStatePath = options.StorageStatePath ?? nested?.StorageStatePath,
             ViewportWidth = nested?.ViewportWidth ?? 1920,
             ViewportHeight = nested?.ViewportHeight ?? 1080

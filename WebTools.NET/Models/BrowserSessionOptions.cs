@@ -16,6 +16,8 @@ public sealed class BrowserSessionOptions
 
     private int _viewportWidth = 1920;
 
+    private EScreenshotScope _defaultScreenshotScope = EScreenshotScope.Viewport;
+
     /// <summary>Maximum number of operations per session. Default: 50.</summary>
     public int MaxOperations
     {
@@ -53,6 +55,22 @@ public sealed class BrowserSessionOptions
 
     /// <summary>When true, each snapshot includes a base64-encoded PNG screenshot. Default: false.</summary>
     public bool IncludeScreenshot { get; init; }
+
+    /// <summary>Default screenshot scope when snapshots include screenshots. Default: Viewport.</summary>
+    public EScreenshotScope DefaultScreenshotScope
+    {
+        get => _defaultScreenshotScope;
+        init
+        {
+            if (value != EScreenshotScope.Viewport && value != EScreenshotScope.FullPage)
+            {
+                throw new ArgumentOutOfRangeException(nameof(DefaultScreenshotScope), value,
+                    "Unsupported screenshot scope.");
+            }
+
+            _defaultScreenshotScope = value;
+        }
+    }
 
     /// <summary>
     /// File path for persisting browser storage state (cookies and local storage).
