@@ -444,7 +444,8 @@ public sealed class BrowserSession : IAsyncDisposable
         if (_options.IncludeScreenshot)
         {
             await CaptureAsync(
-                () => _browser.ScreenshotAsync(operationToken),
+                () => _browser.ScreenshotAsync(
+                    _options.DefaultScreenshotScope, operationToken),
                 value => screenshot = value,
                 reportFailure: false).ConfigureAwait(false);
         }

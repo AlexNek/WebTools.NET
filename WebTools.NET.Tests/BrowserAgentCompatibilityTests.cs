@@ -57,6 +57,33 @@ public class BrowserAgentCompatibilityTests
     }
 
     [Fact]
+    public async Task BrowserAgent_ForwardsNestedScreenshotScopeToCurrentSession()
+    {
+        // Arrange
+        var browser = CreateBrowser();
+        browser.ScreenshotAsync(EScreenshotScope.FullPage, Arg.Any<CancellationToken>())
+            .Returns("full-page-image");
+        await using var sut = new BrowserAgent(
+            browser,
+            new BrowserAgentOptions
+            {
+                SessionOptions = new BrowserSessionOptions
+                {
+                    IncludeScreenshot = true,
+                    DefaultScreenshotScope = EScreenshotScope.FullPage
+                }
+            });
+
+        // Act
+        var snapshot = await sut.StartAsync("https://test.example.com");
+
+        // Assert
+        snapshot.ScreenshotBase64.Should().Be("full-page-image");
+        await browser.Received(1).ScreenshotAsync(
+            EScreenshotScope.FullPage, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task BrowserAgent_DisposeDoesNotDisposeExternallySuppliedBrowser()
     {
         // Arrange

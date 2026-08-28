@@ -123,12 +123,21 @@ public interface IBrowserSession : IBrowserInteraction
     Task<bool> HasMoreContentAsync(CancellationToken ct = default);
     Task LoadStorageStateAsync(string path, CancellationToken ct = default);
     Task SaveStorageStateAsync(string path, CancellationToken ct = default);
-    Task<string> ScreenshotAsync(CancellationToken ct = default);
+    Task<string> ScreenshotAsync(EScreenshotScope scope = EScreenshotScope.Viewport, CancellationToken ct = default);
     Task ScrollAsync(int deltaY, CancellationToken ct = default);
     Task SelectOptionAsync(string selector, string value, CancellationToken ct = default);
     Task SubmitFormAsync(string selector, CancellationToken ct = default);
     Task WaitForSelectorAsync(string selector, int timeoutMs, CancellationToken ct = default);
 }
+```
+
+The scope-first overload keeps `ScreenshotAsync()` on the default viewport and
+allows direct full-page capture. If you pass a cancellation token, use the
+named argument because positional `ScreenshotAsync(cancellationToken)` is no
+longer supported:
+
+```csharp
+var screenshot = await session.ScreenshotAsync(ct: cancellationToken);
 ```
 
 Implementations: `PlaywrightSession`, `CloakBrowserSession`.
@@ -186,10 +195,11 @@ public interface IBrowserSessionState
 orchestration wrapper. `ViewportWidth` and `ViewportHeight` are engine-session
 options that must reach `PlaywrightSession` or `CloakBrowserSession` (directly or
 through `IBrowserSessionFactory`). `MaxOperations`, `MaxDuration`,
-`DefaultFormat`, and `IncludeScreenshot` are orchestration options consumed by
-`BrowserSession`; pass the options object when constructing that wrapper.
-`StorageStatePath` is used by both layers when storage persistence is enabled.
-The default viewport is 1920×1080.
+`DefaultFormat`, `IncludeScreenshot`, and `DefaultScreenshotScope` are
+orchestration options consumed by `BrowserSession`; pass the options object when
+constructing that wrapper. `DefaultScreenshotScope` defaults to `Viewport` and
+controls screenshots included in snapshots. `StorageStatePath` is used by both
+layers when storage persistence is enabled. The default viewport is 1920×1080.
 
 ## IGeoRegionProvider
 

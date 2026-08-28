@@ -199,6 +199,26 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public void LegacyOptionsMapper_PreservesNestedDefaultScreenshotScope()
+    {
+        // Arrange
+        var options = new BrowserAgentOptions
+        {
+            SessionOptions = new BrowserSessionOptions
+            {
+                DefaultScreenshotScope = EScreenshotScope.FullPage
+            }
+        };
+
+        // Act
+        var mapped = WebToolsServiceCollectionExtensions.ToSessionOptions(options);
+
+        // Assert
+        mapped.Should().NotBeNull();
+        mapped!.DefaultScreenshotScope.Should().Be(EScreenshotScope.FullPage);
+    }
+
+    [Fact]
     public void AddBrowserServices_LegacyNullOptionsOverload_IsAccepted()
     {
         // Arrange

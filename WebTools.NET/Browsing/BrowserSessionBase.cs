@@ -525,15 +525,27 @@ public abstract class BrowserSessionBase : IBrowserSession, IBrowserSessionLifec
         }
     }
 
-    public async Task<string> ScreenshotAsync(CancellationToken ct = default)
+    public async Task<string> ScreenshotAsync(
+        EScreenshotScope scope = EScreenshotScope.Viewport,
+        CancellationToken ct = default)
     {
+        if (scope != EScreenshotScope.Viewport && scope != EScreenshotScope.FullPage)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scope), scope,
+                "Unsupported screenshot scope.");
+        }
+
         ThrowIfDisposed();
         ct.ThrowIfCancellationRequested();
         await _operationLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var page = await GetPageAsync(ct).ConfigureAwait(false);
-            var bytes = await page.ScreenshotAsync(new PageScreenshotOptions { FullPage = false })
+            var bytes = await page.ScreenshotAsync(
+                new PageScreenshotOptions
+                {
+                    FullPage = scope == EScreenshotScope.FullPage
+                })
                 .AwaitWithCancellationAsync(ct)
                 .ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
