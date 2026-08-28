@@ -10,6 +10,30 @@ namespace WebTools.NET.Tests;
 public class BrowserSessionOptionsTests
 {
     [Fact]
+    public void DefaultScreenshotScope_DefaultsToViewport()
+    {
+        // Arrange / Act
+        var options = new BrowserSessionOptions();
+
+        // Assert
+        options.DefaultScreenshotScope.Should().Be(EScreenshotScope.Viewport);
+    }
+
+    [Fact]
+    public void DefaultScreenshotScope_WhenUnsupported_Throws()
+    {
+        // Arrange
+        var act = () => new BrowserSessionOptions
+        {
+            DefaultScreenshotScope = (EScreenshotScope)99
+        };
+
+        // Act / Assert
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .Which.ParamName.Should().Be("DefaultScreenshotScope");
+    }
+
+    [Fact]
     public async Task PlaywrightSession_UsesConfiguredViewportHeight()
     {
         // Arrange

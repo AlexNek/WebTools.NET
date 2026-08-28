@@ -633,6 +633,52 @@ public class BrowserSessionTests
     }
 
     [Fact]
+    public async Task StartAsync_WhenScreenshotScopeDefaultsToViewport_UsesTokenOnlyScreenshot()
+    {
+        // Arrange
+        var browser = CreateBrowser();
+        browser.ScreenshotAsync(Arg.Any<CancellationToken>())
+            .Returns("viewport-image");
+        await using var sut = new BrowserSession(
+            browser,
+            new BrowserSessionOptions { IncludeScreenshot = true });
+
+        // Act
+        var snapshot = await sut.StartAsync("https://test.example.com");
+
+        // Assert
+        snapshot.ScreenshotBase64.Should().Be("viewport-image");
+        await browser.Received(1).ScreenshotAsync(Arg.Any<CancellationToken>());
+        await browser.DidNotReceive().ScreenshotAsync(
+            Arg.Any<EScreenshotScope>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartAsync_WhenScreenshotScopeIsFullPage_UsesScopeAwareScreenshot()
+    {
+        // Arrange
+        var browser = CreateBrowser();
+        browser.ScreenshotAsync(EScreenshotScope.FullPage, Arg.Any<CancellationToken>())
+            .Returns("full-page-image");
+        await using var sut = new BrowserSession(
+            browser,
+            new BrowserSessionOptions
+            {
+                IncludeScreenshot = true,
+                DefaultScreenshotScope = EScreenshotScope.FullPage
+            });
+
+        // Act
+        var snapshot = await sut.StartAsync("https://test.example.com");
+
+        // Assert
+        snapshot.ScreenshotBase64.Should().Be("full-page-image");
+        await browser.Received(1).ScreenshotAsync(
+            EScreenshotScope.FullPage, Arg.Any<CancellationToken>());
+        await browser.DidNotReceive().ScreenshotAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task StartAsync_WhenElementExtractionFails_PreservesNavigationStatus()
     {
         // Arrange

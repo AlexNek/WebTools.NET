@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Reusable complete-HTML analysis through the `WebTools.NET.ContentAnalysis` companion package, including structured-data inspection, semantic text and link extraction, configurable topic-neutral candidate detection, read-only bounded results with truncation and omission metadata, and browser current-page composition.
-- Configurable browser screenshots through `EScreenshotScope.Viewport` and `EScreenshotScope.FullPage`, including per-call selection and `BrowserSessionOptions.DefaultScreenshotScope` for opt-in snapshot screenshots.
+- Configurable browser screenshots through `EScreenshotScope.Viewport` and `EScreenshotScope.FullPage`, including per-call selection and `BrowserSessionOptions.DefaultScreenshotScope` for opt-in snapshot screenshots; the added public interface member is additive for callers but requires external implementations of `IBrowserScreenshot` and its composite contracts to implement the scope-aware overload.
 
 ## [1.4.0] - 2026-08-23
 

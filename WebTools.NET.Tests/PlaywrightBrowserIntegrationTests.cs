@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+
 using FluentAssertions;
 
 using WebTools.NET.Browsing;
@@ -15,6 +17,36 @@ namespace WebTools.NET.Tests;
 [Trait("Category", "BrowserLocal")]
 public class PlaywrightBrowserIntegrationTests
 {
+    [Fact]
+    public async Task PlaywrightSession_ScreenshotScopeControlsCapturedPageHeight()
+    {
+        // Arrange
+        await using var server = await TestHttpServer.StartAsync(
+            "<html><body style=\"margin:0\"><div style=\"height:2000px;background:#123456\"></div></body></html>");
+        await using var session = new PlaywrightSession(
+            options: new BrowserSessionOptions { ViewportWidth = 800, ViewportHeight = 600 });
+        await session.NavigateAsync(server.Url);
+
+        // Act
+        var viewportScreenshot = await session.ScreenshotAsync(EScreenshotScope.Viewport);
+        var legacyScreenshot = await session.ScreenshotAsync();
+        var fullPageScreenshot = await session.ScreenshotAsync(EScreenshotScope.FullPage);
+
+        // Assert
+        var viewportHeight = ReadPngHeight(viewportScreenshot);
+        var legacyHeight = ReadPngHeight(legacyScreenshot);
+        var fullPageHeight = ReadPngHeight(fullPageScreenshot);
+        viewportHeight.Should().Be(600);
+        legacyHeight.Should().Be(viewportHeight);
+        fullPageHeight.Should().BeGreaterThan(viewportHeight);
+    }
+
+    private static int ReadPngHeight(string screenshotBase64)
+    {
+        var bytes = Convert.FromBase64String(screenshotBase64);
+        return BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(20, sizeof(int)));
+    }
+
     [Fact]
     public async Task PlaywrightContentFetcher_FetchesLocalPage()
     {
