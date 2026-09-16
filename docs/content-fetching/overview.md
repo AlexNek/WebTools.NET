@@ -26,7 +26,93 @@ The returned `WebContent` record:
 | `Success` | Whether the fetch completed successfully |
 | `Content` | Page content extracted from the rendered body (HTML stripped) |
 | `ErrorMessage` | Failure reason when `Success` is `false` |
-| `FinalUrl` | The browser-reported URL once page navigation and the bounded post-load observation window are complete, including server-side redirects and observed client-side navigation |
+| `FinalUrl` | The browser-reported URL once page navigation and the bounded post-load observation window are complete, including server-side redirects and observed client-side navigation; `null` when navigation never completed, for example on a timeout or a browser failure |
+
+## FinalUrl Nullability (breaking change)
+
+`WebContent.FinalUrl` is `string?`. It carries the browser-reported URL when
+navigation completes, and is `null` when the browser never landed — for
+example when a fetch times out or the browser fails. This matches
+`UrlCheckResult.FinalUrl`, which already reports `null` on the same failure
+paths.
+
+Earlier versions typed `FinalUrl` as a non-nullable `string` and, on those
+failure paths, returned the *requested* URL as if the browser had reached it.
+That value was misleading: a caller comparing `FinalUrl` with the requested URL
+to detect a redirect saw "no redirect", and a caller logging `FinalUrl` printed
+an address the browser never reached.
+
+### What changed
+
+| | Before (≤ 1.5.0) | After (1.6.0) |
+| --- | --- | --- |
+| `FinalUrl` type | `string` (non-nullable) | `string?` (nullable) |
+| Value on a successful fetch | Browser's landed URL | Browser's landed URL (unchanged) |
+| Value on a timeout | The requested URL (never actually reached) | `null` |
+| Value on a browser failure | The requested URL (never actually reached) | `null` |
+
+### Migration
+
+There are three kinds of code that need a change. If your project does not
+enable nullable reference types and never inspects `FinalUrl` on a failed
+fetch, no change is required.
+
+**1. You assign `FinalUrl` to a non-nullable `string`.**
+
+The type is now `string?`, so this assignment produces a nullable warning
+(CS8600) and any later member access produces CS8602.
+
+```csharp
+// Before — compiled clean when FinalUrl was string:
+string finalUrl = content.FinalUrl;
+Console.WriteLine(finalUrl.Length);
+
+// After — accept the nullable and guard before use:
+string? finalUrl = content.FinalUrl;
+if (finalUrl is not null)
+{
+    Console.WriteLine(finalUrl.Length);
+}
+```
+
+**2. You read `FinalUrl` on a failed fetch (logging, redirect detection).**
+
+The value is no longer the requested URL on a timeout or browser failure — it
+is `null`. Code that relied on it always being a URL now sees `null`.
+
+```csharp
+// Before — on a timeout this logged the requested URL, which was misleading
+// because the browser never reached it:
+logger.LogWarning("Failed at {Url}", content.FinalUrl);
+
+// After — branch on whether the browser actually landed:
+if (content.FinalUrl is { } finalUrl)
+{
+    logger.LogWarning("Failed after landing on {Url}", finalUrl);
+}
+else
+{
+    logger.LogWarning("Fetch never navigated: {Error}", content.ErrorMessage);
+}
+```
+
+A redirect check that compared `FinalUrl` with the requested URL was also
+wrong before: on a failed fetch the two were equal, so it reported "no
+redirect" for a fetch that never navigated. After this change that comparison
+should treat `null` as "no landing URL", not "no redirect".
+
+**3. You construct a `WebContent` yourself for a stubbed failure.**
+
+You previously had to invent a URL (or pass a null literal against a
+non-nullable parameter, which warned as CS8625). Now pass `null`:
+
+```csharp
+// Before — had to supply a URL the code never visited:
+var failure = new WebContent(false, "", "Request timed out", requestedUrl);
+
+// After — state that there was no landing URL:
+var failure = new WebContent(false, "", "Request timed out", null);
+```
 
 ## Limiting Content Length
 

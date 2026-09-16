@@ -99,6 +99,12 @@ if (content.Success)
 }
 ```
 
+`WebContent.FinalUrl` is `string?`: it holds the browser's URL after navigation
+completes and is `null` when the browser never landed (for example on a timeout
+or a browser failure). Guard it before use outside a `Success` check. See
+[content fetching](docs/content-fetching/overview.md#finalurl-nullability-breaking-change)
+for migration details.
+
 ### Search the web
 
 `WebSearchService` wraps any `IWebSearchProvider` and automatically retries with

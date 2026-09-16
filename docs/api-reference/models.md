@@ -40,7 +40,7 @@ public sealed record WebContent(
     bool Success,
     string Content,
     string? ErrorMessage,
-    string FinalUrl);
+    string? FinalUrl);
 ```
 
 | Property | Description |
@@ -48,7 +48,7 @@ public sealed record WebContent(
 | `Success` | Whether the fetch completed successfully |
 | `Content` | Content in the representation requested by the fetch operation: plain text for `FetchAsync`, or the selected `EContentFormat` for `FetchAsAsync` |
 | `ErrorMessage` | Failure reason when `Success` is `false` |
-| `FinalUrl` | Browser-reported URL once page navigation and the bounded post-load observation window are complete, including observed server-side redirects and client-side navigation |
+| `FinalUrl` | Browser-reported URL once page navigation and the bounded post-load observation window are complete, including observed server-side redirects and client-side navigation; `null` only when navigation fails before producing a result (for example a timeout or browser failure before navigation completes). If navigation completes but a later fetch or observation step fails, the last known landed URL is retained and returned |
 
 ## HtmlAnalysisResult and related models
 
@@ -66,8 +66,10 @@ public sealed record UrlCheckResult(
     string? ErrorMessage,
     int RedirectCount = 0,
     string? FinalUrl = null,
-    string? ProtectionType = null,
-    int ClientRedirectCount = 0);
+    string? ProtectionType = null)
+{
+    public int ClientRedirectCount { get; init; }
+}
 ```
 
 | Property | Description |
@@ -77,5 +79,5 @@ public sealed record UrlCheckResult(
 | `ErrorMessage` | Failure reason when not reachable |
 | `RedirectCount` | Number of redirects followed |
 | `FinalUrl` | URL after the reachability check completes; for browser checks, this includes observed client-side navigation |
-| `ClientRedirectCount` | Number of observed main-frame client-side URL changes during the bounded browser observation window; can be greater than `1` |
 | `ProtectionType` | Detected protection type, when reported by the engine |
+| `ClientRedirectCount` | Number of observed main-frame client-side URL changes during the bounded browser observation window; can be greater than `1`; set via object initializer rather than a constructor argument |

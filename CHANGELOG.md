@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-17
+
 ### Changed
 
 - Browser-based search providers support an opt-in visible-browser retry when both Bing and DuckDuckGo block a headless session; the retry is disabled by default, headless-only, serialized per provider, and reports launch failures through `SearchResult`.
 - Consolidated the WebTools.NET.ContentAnalysis assembly into the WebTools.NET NuGet package while retaining the separate project for build and test isolation.
+
+### Fixed
+
+- **Breaking:** `WebContent.FinalUrl` is now `string?` instead of `string`. On timeout or browser failure, it reports `null` instead of repeating the requested URL. See the [content-fetching documentation](docs/content-fetching/overview.md) for migration guidance.
 
 ## [1.5.0] - 2026-08-28
 
@@ -136,7 +142,11 @@ The following obsolete names are retained for migration:
 - Unit tests with xUnit, FluentAssertions, and NSubstitute
 - Developer manual published as a documentation site via MkDocs Material and GitHub Pages
 
-[Unreleased]: https://github.com/AlexNek/WebTools.NET/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/AlexNek/WebTools.NET/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.5.0
+[1.4.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.4.0
+[1.3.1]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.3.1
+[1.3.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.3.0
 [1.2.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.2.0
 [1.1.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.1.0
 [1.0.0]: https://github.com/AlexNek/WebTools.NET/releases/tag/v1.0.0

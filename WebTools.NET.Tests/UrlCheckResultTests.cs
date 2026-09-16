@@ -38,6 +38,7 @@ public class UrlCheckResultTests
             Reachable: false,
             HttpStatus: 403,
             ErrorMessage: "Blocked",
+            FinalUrl: null,
             ProtectionType: "Cloudflare");
 
         // Assert

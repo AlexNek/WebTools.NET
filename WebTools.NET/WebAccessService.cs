@@ -51,11 +51,11 @@ public sealed class WebAccessService : IWebAccessService, IDisposable
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            return new UrlCheckResult(false, null, "Timed out");
+            return new UrlCheckResult(false, null, "Timed out", FinalUrl: null);
         }
         catch (HttpRequestException ex)
         {
-            return new UrlCheckResult(false, null, $"HTTP request failed: {ex.Message}");
+            return new UrlCheckResult(false, null, $"HTTP request failed: {ex.Message}", FinalUrl: null);
         }
     }
 
@@ -88,8 +88,8 @@ public sealed class WebAccessService : IWebAccessService, IDisposable
                         false,
                         status,
                         $"HTTP {status} redirect missing Location header",
-                        redirectCount,
-                        currentUrl);
+                        FinalUrl: currentUrl,
+                        RedirectCount: redirectCount);
                 }
 
                 currentUrl = location.IsAbsoluteUri
@@ -106,15 +106,15 @@ public sealed class WebAccessService : IWebAccessService, IDisposable
                 reachable,
                 status,
                 reachable ? null : $"HTTP {status}",
-                redirectCount,
-                finalUrl);
+                FinalUrl: finalUrl,
+                RedirectCount: redirectCount);
         }
 
         return new UrlCheckResult(
             false,
             null,
             $"Too many redirects ({redirectCount})",
-            redirectCount,
-            currentUrl);
+            FinalUrl: currentUrl,
+            RedirectCount: redirectCount);
     }
 }
