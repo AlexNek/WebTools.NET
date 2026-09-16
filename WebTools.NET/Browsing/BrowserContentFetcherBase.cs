@@ -429,14 +429,15 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
         }
         catch (TimeoutException)
         {
-            return new UrlCheckResult(false, null, "Timed out");
+            return new UrlCheckResult(false, null, "Timed out", null);
         }
         catch (PlaywrightException ex)
         {
             return new UrlCheckResult(
                 false,
                 null,
-                BrowserHelpers.NormalizePlaywrightError(ex, BrowserNotInstalledMessage));
+                BrowserHelpers.NormalizePlaywrightError(ex, BrowserNotInstalledMessage),
+                null);
         }
         finally
         {
