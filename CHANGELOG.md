@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Consolidated the WebTools.NET.ContentAnalysis assembly into the WebTools.NET NuGet package while retaining the separate project for build and test isolation.
+
 ## [1.5.0] - 2026-08-28
 
 ### Added

@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <IsPackable>false</IsPackable>
     <RootNamespace>WebTools.NET.ContentAnalysis</RootNamespace>
     <AssemblyName>WebTools.NET.ContentAnalysis</AssemblyName>
 
