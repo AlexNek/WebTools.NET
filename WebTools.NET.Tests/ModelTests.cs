@@ -65,6 +65,28 @@ public class ModelTests
     }
 
     [Fact]
+    public void WebContent_WhenNavigationNeverCompleted_PreservesNullFinalUrl()
+    {
+        // Arrange & Act
+        var content = new WebContent(false, "", "Request timed out", null);
+
+        // Assert
+        content.Success.Should().BeFalse();
+        content.ErrorMessage.Should().Be("Request timed out");
+        content.FinalUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public void WebContent_WhenSuccessful_KeepsTheUrlItWasGiven()
+    {
+        // Arrange & Act
+        var content = new WebContent(true, "Hello World", null, "https://test.example.com/landed");
+
+        // Assert
+        content.FinalUrl.Should().Be("https://test.example.com/landed");
+    }
+
+    [Fact]
     public void SearchResultItem_RecordEquality_WorksCorrectly()
     {
         // Arrange

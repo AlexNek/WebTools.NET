@@ -29,6 +29,21 @@ public class BrowserContentFetcherBaseTests
     }
 
     [Fact]
+    public async Task FetchAsync_WhenNavigationTimesOut_ReportsNullFinalUrl()
+    {
+        // Arrange
+        await using var sut = new TimeoutBrowserContentFetcher();
+
+        // Act
+        var result = await sut.FetchAsync("https://test.example.com");
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Be("Request timed out");
+        result.FinalUrl.Should().BeNull();
+    }
+
+    [Fact]
     public async Task DisposeAsync_WaitsForAnActiveOperationBeforeDisposingResources()
     {
         // Arrange

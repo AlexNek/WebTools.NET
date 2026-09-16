@@ -488,15 +488,17 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
         }
         catch (TimeoutException)
         {
-            return new WebContent(false, "", "Request timed out", url);
+            // The browser never landed, so no final URL is reported.
+            return new WebContent(false, "", "Request timed out", null);
         }
         catch (PlaywrightException ex)
         {
+            // The browser never landed, so no final URL is reported.
             return new WebContent(
                 false,
                 "",
                 BrowserHelpers.NormalizePlaywrightError(ex, BrowserNotInstalledMessage),
-                url);
+                null);
         }
         finally
         {

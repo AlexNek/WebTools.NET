@@ -40,7 +40,7 @@ public sealed record WebContent(
     bool Success,
     string Content,
     string? ErrorMessage,
-    string FinalUrl);
+    string? FinalUrl);
 ```
 
 | Property | Description |
@@ -48,7 +48,7 @@ public sealed record WebContent(
 | `Success` | Whether the fetch completed successfully |
 | `Content` | Content in the representation requested by the fetch operation: plain text for `FetchAsync`, or the selected `EContentFormat` for `FetchAsAsync` |
 | `ErrorMessage` | Failure reason when `Success` is `false` |
-| `FinalUrl` | Browser-reported URL once page navigation and the bounded post-load observation window are complete, including observed server-side redirects and client-side navigation |
+| `FinalUrl` | Browser-reported URL once page navigation and the bounded post-load observation window are complete, including observed server-side redirects and client-side navigation; `null` when navigation never completed, for example on a timeout or a browser failure |
 
 ## HtmlAnalysisResult and related models
 
