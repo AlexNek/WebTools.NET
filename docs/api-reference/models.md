@@ -48,7 +48,7 @@ public sealed record WebContent(
 | `Success` | Whether the fetch completed successfully |
 | `Content` | Content in the representation requested by the fetch operation: plain text for `FetchAsync`, or the selected `EContentFormat` for `FetchAsAsync` |
 | `ErrorMessage` | Failure reason when `Success` is `false` |
-| `FinalUrl` | Browser-reported URL once page navigation and the bounded post-load observation window are complete, including observed server-side redirects and client-side navigation; `null` when navigation never completed, for example on a timeout or a browser failure |
+| `FinalUrl` | Browser-reported URL once page navigation and the bounded post-load observation window are complete, including observed server-side redirects and client-side navigation; `null` only when navigation fails before producing a result (for example a timeout or browser failure before navigation completes). If navigation completes but a later fetch or observation step fails, the last known landed URL is retained and returned |
 
 ## HtmlAnalysisResult and related models
 

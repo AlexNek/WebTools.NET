@@ -1,5 +1,9 @@
 using FluentAssertions;
 
+using Microsoft.Playwright;
+
+using NSubstitute;
+
 using Xunit;
 
 namespace WebTools.NET.Tests;
@@ -41,6 +45,41 @@ public class BrowserContentFetcherBaseTests
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Be("Request timed out");
         result.FinalUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FetchAsync_WhenBodyReadFailsAfterNavigationCompletes_PreservesLandedFinalUrl()
+    {
+        // Arrange: navigation completes and reports a landed URL, then the subsequent body read
+        // throws a PlaywrightException. The result must retain the landed URL, not null.
+        const string landedUrl = "https://test.example.com/landed";
+
+        var response = Substitute.For<IResponse>();
+        response.Url.Returns(landedUrl);
+        response.Status.Returns(200);
+
+        var page = Substitute.For<IPage>();
+        page.Url.Returns(landedUrl);
+        page.GotoAsync(Arg.Any<string>(), Arg.Any<PageGotoOptions>()).Returns(response);
+        page.WaitForLoadStateAsync(Arg.Any<LoadState>(), Arg.Any<PageWaitForLoadStateOptions>())
+            .Returns(Task.CompletedTask);
+        // The body read is the post-navigation step that fails.
+        page.TextContentAsync("body", Arg.Any<PageTextContentOptions>())
+            .Returns<string?>(_ => throw new PlaywrightException("Body read failed."));
+        page.CloseAsync().Returns(Task.CompletedTask);
+
+        var context = Substitute.For<IBrowserContext>();
+        context.NewPageAsync().Returns(page);
+        context.CloseAsync().Returns(Task.CompletedTask);
+
+        await using var sut = new MockContextBrowserContentFetcher(context);
+
+        // Act
+        var result = await sut.FetchAsync("https://test.example.com/requested");
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.FinalUrl.Should().Be(landedUrl);
     }
 
     [Fact]
