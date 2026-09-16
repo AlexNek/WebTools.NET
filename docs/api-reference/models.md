@@ -66,8 +66,10 @@ public sealed record UrlCheckResult(
     string? ErrorMessage,
     int RedirectCount = 0,
     string? FinalUrl = null,
-    string? ProtectionType = null,
-    int ClientRedirectCount = 0);
+    string? ProtectionType = null)
+{
+    public int ClientRedirectCount { get; init; }
+}
 ```
 
 | Property | Description |
@@ -77,5 +79,5 @@ public sealed record UrlCheckResult(
 | `ErrorMessage` | Failure reason when not reachable |
 | `RedirectCount` | Number of redirects followed |
 | `FinalUrl` | URL after the reachability check completes; for browser checks, this includes observed client-side navigation |
-| `ClientRedirectCount` | Number of observed main-frame client-side URL changes during the bounded browser observation window; can be greater than `1` |
 | `ProtectionType` | Detected protection type, when reported by the engine |
+| `ClientRedirectCount` | Number of observed main-frame client-side URL changes during the bounded browser observation window; can be greater than `1`; set via object initializer rather than a constructor argument |

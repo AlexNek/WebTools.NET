@@ -393,6 +393,9 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
     private async Task<UrlCheckResult> CheckReachabilityCoreAsync(string url, CancellationToken ct)
     {
         IPage? page = null;
+        // Holds the completed navigation result so that a failure after navigation succeeds can
+        // still report the last known final URL. Stays null until navigation produces a result.
+        BrowserNavigationResult? completedNavigation = null;
         try
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(url);
@@ -400,28 +403,29 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
             var navigation = await NavigateWithRetryAsync(url, GotoTimeoutMs, ct)
                 .ConfigureAwait(false);
             page = navigation.Page;
+            completedNavigation = navigation.Navigation;
 
             if (await IsBotChallengePageAsync(page, ct).ConfigureAwait(false))
             {
                 var fallback = await TryReachabilityFallbackAsync(url, ct).ConfigureAwait(false);
                 return fallback ?? new UrlCheckResult(
                     false,
-                    navigation.Navigation.Status,
+                    completedNavigation.Status,
                     "Blocked by bot protection",
-                    RedirectCount: navigation.Navigation.RedirectCount,
-                    FinalUrl: navigation.Navigation.FinalUrl,
+                    RedirectCount: completedNavigation.RedirectCount,
+                    FinalUrl: completedNavigation.FinalUrl,
                     ProtectionType: "Cloudflare")
                 {
-                    ClientRedirectCount = navigation.Navigation.ClientRedirectCount
+                    ClientRedirectCount = completedNavigation.ClientRedirectCount
                 };
             }
 
             ct.ThrowIfCancellationRequested();
             return CreateReachabilityResult(
-                status: navigation.Navigation.Status,
-                finalUrl: navigation.Navigation.FinalUrl,
-                redirectCount: navigation.Navigation.RedirectCount,
-                clientRedirectCount: navigation.Navigation.ClientRedirectCount);
+                status: completedNavigation.Status,
+                finalUrl: completedNavigation.FinalUrl,
+                redirectCount: completedNavigation.RedirectCount,
+                clientRedirectCount: completedNavigation.ClientRedirectCount);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -429,15 +433,17 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
         }
         catch (TimeoutException)
         {
-            return new UrlCheckResult(false, null, "Timed out", null);
+            // Report the final URL only if navigation had already completed before the timeout.
+            return new UrlCheckResult(false, null, "Timed out", FinalUrl: completedNavigation?.FinalUrl);
         }
         catch (PlaywrightException ex)
         {
+            // Report the final URL only if navigation had already completed before the failure.
             return new UrlCheckResult(
                 false,
                 null,
                 BrowserHelpers.NormalizePlaywrightError(ex, BrowserNotInstalledMessage),
-                null);
+                FinalUrl: completedNavigation?.FinalUrl);
         }
         finally
         {
@@ -453,6 +459,9 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
         CancellationToken ct)
     {
         IPage? page = null;
+        // Holds the completed navigation result so that a failure after navigation succeeds can
+        // still report the last known final URL. Stays null until navigation produces a result.
+        BrowserNavigationResult? completedNavigation = null;
         try
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(url);
@@ -460,6 +469,7 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
             var navigation = await NavigateWithRetryAsync(url, FetchGotoTimeoutMs, ct)
                 .ConfigureAwait(false);
             page = navigation.Page;
+            completedNavigation = navigation.Navigation;
 
             if (await IsBotChallengePageAsync(page, ct).ConfigureAwait(false))
             {
@@ -470,15 +480,15 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
                     false,
                     "",
                     "Blocked by bot protection",
-                    navigation.Navigation.FinalUrl);
+                    completedNavigation.FinalUrl);
             }
 
             var rawBody = await GetRawBodyAsync(page, format, ct).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             return CreateFetchResult(
                 rawBody,
-                navigation.Navigation.FinalUrl,
-                navigation.Navigation.Status,
+                completedNavigation.FinalUrl,
+                completedNavigation.Status,
                 format,
                 maxContentLength,
                 sanitizeLevel);
@@ -489,17 +499,17 @@ public abstract class BrowserContentFetcherBase : IWebContentFetcher
         }
         catch (TimeoutException)
         {
-            // The browser never landed, so no final URL is reported.
-            return new WebContent(false, "", "Request timed out", null);
+            // Report the final URL only if navigation had already completed before the timeout.
+            return new WebContent(false, "", "Request timed out", completedNavigation?.FinalUrl);
         }
         catch (PlaywrightException ex)
         {
-            // The browser never landed, so no final URL is reported.
+            // Report the final URL only if navigation had already completed before the failure.
             return new WebContent(
                 false,
                 "",
                 BrowserHelpers.NormalizePlaywrightError(ex, BrowserNotInstalledMessage),
-                null);
+                completedNavigation?.FinalUrl);
         }
         finally
         {
