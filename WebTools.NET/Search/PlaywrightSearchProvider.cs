@@ -50,26 +50,32 @@ public sealed class PlaywrightSearchProvider : IWebSearchProvider, IAsyncDisposa
             return;
         }
 
-        await _fallbackLock.WaitAsync().ConfigureAwait(false);
+        await _initLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var context = Interlocked.Exchange(ref _context, null);
-            if (context is not null)
+            await _fallbackLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                await CloseContextQuietlyAsync(context).ConfigureAwait(false);
+                var context = Interlocked.Exchange(ref _context, null);
+                if (context is not null)
+                {
+                    await CloseContextQuietlyAsync(context).ConfigureAwait(false);
+                }
+
+                var browser = Interlocked.Exchange(ref _browser, null);
+                await CloseBrowserQuietlyAsync(browser).ConfigureAwait(false);
+
+                var playwright = Interlocked.Exchange(ref _playwright, null);
+                playwright?.Dispose();
             }
-
-            var browser = Interlocked.Exchange(ref _browser, null);
-            await CloseBrowserQuietlyAsync(browser).ConfigureAwait(false);
-
-            var playwright = Interlocked.Exchange(ref _playwright, null);
-            playwright?.Dispose();
+            finally
+            {
+                _fallbackLock.Release();
+            }
         }
         finally
         {
-            _fallbackLock.Release();
-            _fallbackLock.Dispose();
-            _initLock.Dispose();
+            _initLock.Release();
         }
     }
 

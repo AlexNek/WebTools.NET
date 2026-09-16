@@ -52,21 +52,27 @@ public sealed class CloakBrowserSearchProvider : IWebSearchProvider, IAsyncDispo
             return;
         }
 
-        await _fallbackLock.WaitAsync().ConfigureAwait(false);
+        await _initLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var context = Interlocked.Exchange(ref _context, null);
-            await CloseContextQuietlyAsync(context).ConfigureAwait(false);
+            await _fallbackLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                var context = Interlocked.Exchange(ref _context, null);
+                await CloseContextQuietlyAsync(context).ConfigureAwait(false);
 
-            var handle = Interlocked.Exchange(ref _handle, null);
-            await DisposeHandleQuietlyAsync(handle).ConfigureAwait(false);
-            Interlocked.Exchange(ref _browser, null);
+                var handle = Interlocked.Exchange(ref _handle, null);
+                await DisposeHandleQuietlyAsync(handle).ConfigureAwait(false);
+                Interlocked.Exchange(ref _browser, null);
+            }
+            finally
+            {
+                _fallbackLock.Release();
+            }
         }
         finally
         {
-            _fallbackLock.Release();
-            _fallbackLock.Dispose();
-            _initLock.Dispose();
+            _initLock.Release();
         }
     }
 

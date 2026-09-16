@@ -204,12 +204,14 @@ internal sealed class BrowserSearchEngine
                 {
                     WaitUntil = WaitUntilState.DOMContentLoaded,
                     Timeout = SearchGotoTimeoutMs
-                });
+                })
+                .AwaitWithCancellationAsync(ct);
 
             try
             {
                 await page.Locator("#sb_form_q")
-                    .WaitForAsync(new LocatorWaitForOptions { Timeout = SelectorWaitTimeoutMs });
+                    .WaitForAsync(new LocatorWaitForOptions { Timeout = SelectorWaitTimeoutMs })
+                    .AwaitWithCancellationAsync(ct);
             }
             catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
             {
@@ -217,21 +219,27 @@ internal sealed class BrowserSearchEngine
                     page,
                     "Bing blocked request",
                     "Bing search form unavailable",
-                    SearchFailureKind.Other);
+                    SearchFailureKind.Other,
+                    ct);
             }
 
             await TypeHumanLikeAsync(page, "#sb_form_q", query, ct);
 
             var startUrl = page.Url;
-            await page.Keyboard.PressAsync("Enter");
+            await page.Keyboard.PressAsync("Enter").AwaitWithCancellationAsync(ct);
 
-            if (!await TryWaitForUrlChangeAsync(page, startUrl))
+            if (!await TryWaitForUrlChangeAsync(page, startUrl, ct))
             {
                 return Failure("Bing navigation timeout", SearchFailureKind.Timeout);
             }
 
             if (!page.Url.Contains("bing.com/search", StringComparison.OrdinalIgnoreCase))
             {
+                if (await IsBlockingPageAsync(page, ct))
+                {
+                    return Failure("Bing blocked request", SearchFailureKind.Blocked);
+                }
+
                 return Failure("Bing navigation to unexpected URL", SearchFailureKind.Other);
             }
 
@@ -239,7 +247,8 @@ internal sealed class BrowserSearchEngine
             {
                 await page.WaitForSelectorAsync(
                     "#b_results",
-                    new PageWaitForSelectorOptions { Timeout = SelectorWaitTimeoutMs });
+                    new PageWaitForSelectorOptions { Timeout = SelectorWaitTimeoutMs })
+                .AwaitWithCancellationAsync(ct);
             }
             catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
             {
@@ -247,7 +256,8 @@ internal sealed class BrowserSearchEngine
                     page,
                     "Bing blocked request",
                     "No Bing results matched",
-                    SearchFailureKind.NoResults);
+                    SearchFailureKind.NoResults,
+                    ct);
             }
 
             var json = await page.EvaluateAsync<string>(
@@ -292,7 +302,8 @@ internal sealed class BrowserSearchEngine
                     snippet: snippet?.textContent?.trim() ?? ''
                 };
             }))
-        ");
+        ")
+                .AwaitWithCancellationAsync(ct);
 
             var raw = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(json)!;
             var items = new List<SearchResultItem>();
@@ -350,12 +361,14 @@ internal sealed class BrowserSearchEngine
                 {
                     WaitUntil = WaitUntilState.DOMContentLoaded,
                     Timeout = SearchGotoTimeoutMs
-                });
+                })
+                .AwaitWithCancellationAsync(ct);
 
             try
             {
                 await page.Locator("#searchbox_input")
-                    .WaitForAsync(new LocatorWaitForOptions { Timeout = SelectorWaitTimeoutMs });
+                    .WaitForAsync(new LocatorWaitForOptions { Timeout = SelectorWaitTimeoutMs })
+                    .AwaitWithCancellationAsync(ct);
             }
             catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
             {
@@ -363,15 +376,16 @@ internal sealed class BrowserSearchEngine
                     page,
                     "Search engine blocked the request",
                     "DuckDuckGo search box unavailable",
-                    SearchFailureKind.Other);
+                    SearchFailureKind.Other,
+                    ct);
             }
 
             await TypeHumanLikeAsync(page, "#searchbox_input", query, ct);
 
             var startUrl = page.Url;
-            await page.Keyboard.PressAsync("Enter");
+            await page.Keyboard.PressAsync("Enter").AwaitWithCancellationAsync(ct);
 
-            if (!await TryWaitForUrlChangeAsync(page, startUrl))
+            if (!await TryWaitForUrlChangeAsync(page, startUrl, ct))
             {
                 return Failure("DuckDuckGo navigation timeout", SearchFailureKind.Timeout);
             }
@@ -380,11 +394,12 @@ internal sealed class BrowserSearchEngine
             {
                 await page.WaitForSelectorAsync(
                     "article[data-testid='result']",
-                    new PageWaitForSelectorOptions { Timeout = SelectorWaitTimeoutMs });
+                    new PageWaitForSelectorOptions { Timeout = SelectorWaitTimeoutMs })
+                .AwaitWithCancellationAsync(ct);
             }
             catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
             {
-                if (await IsBlockingPageAsync(page))
+                if (await IsBlockingPageAsync(page, ct))
                 {
                     return Failure("Search engine blocked the request", SearchFailureKind.Blocked);
                 }
@@ -409,7 +424,8 @@ internal sealed class BrowserSearchEngine
                     };
                 })
             )
-        ");
+        ")
+                .AwaitWithCancellationAsync(ct);
 
             var items = new List<SearchResultItem>();
             using var doc = JsonDocument.Parse(resultsJson);
@@ -451,14 +467,15 @@ internal sealed class BrowserSearchEngine
         IPage page,
         string blockedMessage,
         string nonBlockedMessage,
-        SearchFailureKind nonBlockedKind)
+        SearchFailureKind nonBlockedKind,
+        CancellationToken ct)
     {
-        return await IsBlockingPageAsync(page)
+        return await IsBlockingPageAsync(page, ct)
             ? Failure(blockedMessage, SearchFailureKind.Blocked)
             : Failure(nonBlockedMessage, nonBlockedKind);
     }
 
-    private static async Task<bool> IsBlockingPageAsync(IPage page)
+    private static async Task<bool> IsBlockingPageAsync(IPage page, CancellationToken ct)
     {
         try
         {
@@ -467,7 +484,8 @@ internal sealed class BrowserSearchEngine
                     const title = document.title || '';
                     const html = document.documentElement?.outerHTML || '';
                     return (title + '\n' + html).toLowerCase();
-                })()");
+                })()")
+                .AwaitWithCancellationAsync(ct);
 
             string[] markers =
             [
@@ -482,6 +500,10 @@ internal sealed class BrowserSearchEngine
             ];
 
             return markers.Any(content.Contains);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception) when (page is not null)
         {
@@ -553,15 +575,23 @@ internal sealed class BrowserSearchEngine
         return rawUrl;
     }
 
-    private static async Task<bool> TryWaitForUrlChangeAsync(IPage page, string startUrl)
+    private static async Task<bool> TryWaitForUrlChangeAsync(
+        IPage page,
+        string startUrl,
+        CancellationToken ct)
     {
         try
         {
             await page.WaitForFunctionAsync(
                 "start => window.location.href !== start",
                 startUrl,
-                new PageWaitForFunctionOptions { Timeout = UrlChangeTimeoutMs });
+                new PageWaitForFunctionOptions { Timeout = UrlChangeTimeoutMs })
+                .AwaitWithCancellationAsync(ct);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -575,12 +605,12 @@ internal sealed class BrowserSearchEngine
         string text,
         CancellationToken ct)
     {
-        await page.Locator(selector).ClickAsync();
+        await page.Locator(selector).ClickAsync().AwaitWithCancellationAsync(ct);
         await _delayAsync(Rng.Next(TypeStartDelayMinMs, TypeStartDelayMaxMs), ct);
 
         foreach (var ch in text)
         {
-            await page.Keyboard.TypeAsync(ch.ToString());
+            await page.Keyboard.TypeAsync(ch.ToString()).AwaitWithCancellationAsync(ct);
             await _delayAsync(Rng.Next(TypePauseMinMs, TypePauseMaxMs), ct);
         }
     }

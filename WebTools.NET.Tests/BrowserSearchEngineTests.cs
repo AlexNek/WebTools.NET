@@ -89,33 +89,43 @@ public class BrowserSearchEngineTests
     }
 
     [Fact]
-    public async Task SearchAsync_WhenCanceledBeforePrimaryAttempt_DoesNotInvokeFallback()
+    public async Task SearchAsync_WhenCanceledAfterBothPrimaryAttempts_DoesNotInvokeFallback()
     {
         // Arrange
         var primaryCalls = 0;
+        var primaryEvaluations = 0;
         var fallbackCalls = 0;
-        var sut = new BrowserSearchEngine(
+        using var cts = new CancellationTokenSource();
+        var primaryPage = CreateBlockedPage("captcha");
+        primaryPage.EvaluateAsync<string>(Arg.Any<string>())
+            .Returns(_ =>
+            {
+                if (Interlocked.Increment(ref primaryEvaluations) == 2)
+                {
+                    cts.Cancel();
+                }
+
+                return Task.FromResult("captcha");
+            });
+        var sut = CreateEngine(
             _ =>
             {
                 primaryCalls++;
-                return Task.FromException<IPage>(new InvalidOperationException("primary should not start"));
+                return Task.FromResult<IPage>(primaryPage);
             },
-            logger: null,
-            engineName: "Test",
             _ =>
             {
                 fallbackCalls++;
                 return Task.FromException<ISearchPageLease>(new InvalidOperationException("fallback should not start"));
             });
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
 
         // Act
         var result = await sut.SearchAsync("query", 1, cts.Token);
 
         // Assert
         result.ErrorMessage.Should().Be("Search timed out");
-        primaryCalls.Should().Be(0);
+        primaryCalls.Should().Be(1);
+        primaryEvaluations.Should().Be(2);
         fallbackCalls.Should().Be(0);
     }
 
