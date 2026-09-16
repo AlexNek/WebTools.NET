@@ -33,7 +33,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WebTools.NET.ContentAnalysis\WebTools.NET.ContentAnalysis.csproj"
-                      PrivateAssets="all"
                       TreatAsPackageReference="false" />
   </ItemGroup>
 
