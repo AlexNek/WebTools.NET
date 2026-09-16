@@ -19,11 +19,21 @@ public static class WebToolsServiceCollectionExtensions
     /// Registers browser-backed content/search services, legacy low-level browser
     /// services, and a factory for creating isolated browser-session sessions.
     /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <param name="engine">The browser engine used by browser-backed services.</param>
+    /// <param name="headless">Whether primary browser services run headless.</param>
+    /// <param name="browserSessionOptions">Optional browser-session configuration.</param>
+    /// <param name="enableVisibleSearchFallback">
+    /// Enables one temporary visible-browser retry for headless search providers
+    /// when both Bing and DuckDuckGo are classified as blocked. Defaults to false
+    /// because visible browser windows are an explicit application choice.
+    /// </param>
     public static IServiceCollection AddBrowserServices(
         this IServiceCollection services,
         EBrowserEngine engine = EBrowserEngine.Playwright,
         bool headless = true,
-        BrowserSessionOptions? browserSessionOptions = null)
+        BrowserSessionOptions? browserSessionOptions = null,
+        bool enableVisibleSearchFallback = false)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -43,7 +53,8 @@ public static class WebToolsServiceCollectionExtensions
                     new CloakBrowserContentFetcher(headless));
                 services.TryAddSingleton<IWebSearchProvider>(sp => new CloakBrowserSearchProvider(
                     sp.GetService<Logging.ILogger<CloakBrowserSearchProvider>>(),
-                    headless));
+                    headless,
+                    enableVisibleSearchFallback));
                 services.TryAddSingleton<CloakBrowserSession>(_ =>
                     new CloakBrowserSession(
                         storageStatePath: browserSessionOptions?.StorageStatePath,
@@ -62,7 +73,8 @@ public static class WebToolsServiceCollectionExtensions
                     new PlaywrightContentFetcher(headless));
                 services.TryAddSingleton<IWebSearchProvider>(sp => new PlaywrightSearchProvider(
                     sp.GetService<Logging.ILogger<PlaywrightSearchProvider>>(),
-                    headless));
+                    headless,
+                    enableVisibleSearchFallback));
                 services.TryAddSingleton<PlaywrightSession>(_ =>
                     new PlaywrightSession(
                         storageStatePath: browserSessionOptions?.StorageStatePath,

@@ -5,13 +5,48 @@ using Microsoft.Extensions.DependencyInjection;
 using WebTools.NET.Abstractions;
 using WebTools.NET.Browsing;
 using WebTools.NET.Models;
+using WebTools.NET.Search;
 
 using Xunit;
 
 namespace WebTools.NET.Tests;
 
-public class ServiceRegistrationTests
+public class WebToolsServiceCollectionExtensionsTests
 {
+    [Fact]
+    public async Task AddBrowserServices_DefaultsVisibleFallbackToDisabled()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddBrowserServices(EBrowserEngine.CloakBrowser);
+        await using var provider = services.BuildServiceProvider();
+
+        // Act
+        var searchProvider = provider.GetRequiredService<IWebSearchProvider>()
+            .Should().BeOfType<CloakBrowserSearchProvider>().Subject;
+
+        // Assert
+        searchProvider.VisibleFallbackEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AddBrowserServices_EnablesVisibleFallbackWhenRequested()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddBrowserServices(
+            EBrowserEngine.CloakBrowser,
+            enableVisibleSearchFallback: true);
+        await using var provider = services.BuildServiceProvider();
+
+        // Act
+        var searchProvider = provider.GetRequiredService<IWebSearchProvider>()
+            .Should().BeOfType<CloakBrowserSearchProvider>().Subject;
+
+        // Assert
+        searchProvider.VisibleFallbackEnabled.Should().BeTrue();
+    }
+
     [Fact]
     public void AddWebToolsCore_RegistersWebAccessService()
     {

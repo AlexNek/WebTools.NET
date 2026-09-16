@@ -1,6 +1,7 @@
 using CloakBrowser;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Playwright;
 
 using WebTools.NET.Abstractions;
 using WebTools.NET.Models;
@@ -17,51 +18,62 @@ public sealed class CloakBrowserSearchProvider : IWebSearchProvider, IAsyncDispo
 
     private readonly bool _headless;
 
+    private readonly SemaphoreSlim _fallbackLock = new(1, 1);
+
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
-    private Microsoft.Playwright.IBrowser? _browser;
+    private IBrowser? _browser;
 
-    private Microsoft.Playwright.IBrowserContext? _context;
+    private IBrowserContext? _context;
 
     private CloakBrowserHandle? _handle;
 
+    private int _disposed;
+
     public CloakBrowserSearchProvider(
         ILogger<CloakBrowserSearchProvider>? logger = null,
-        bool headless = true)
+        bool headless = true,
+        bool enableVisibleSearchFallback = false)
     {
         _headless = headless;
-        _engine = new BrowserSearchEngine(GetPageAsync, logger, "CloakBrowser");
+        _engine = new BrowserSearchEngine(
+            GetPageAsync,
+            logger,
+            "CloakBrowser",
+            headless && enableVisibleSearchFallback ? CreateFallbackPageLeaseAsync : null);
     }
+
+    internal bool VisibleFallbackEnabled => _engine.HasFallbackFactory;
 
     public async ValueTask DisposeAsync()
     {
-        if (_context is not null)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
-            try
-            {
-                await _context.CloseAsync().WaitAsync(TimeSpan.FromSeconds(5))
-                    .ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-            }
+            return;
         }
 
-        if (_handle is not null)
+        await _initLock.WaitAsync().ConfigureAwait(false);
+        try
         {
+            await _fallbackLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                await _handle.DisposeAsync().ConfigureAwait(false);
+                var context = Interlocked.Exchange(ref _context, null);
+                await CloseContextQuietlyAsync(context).ConfigureAwait(false);
+
+                var handle = Interlocked.Exchange(ref _handle, null);
+                await DisposeHandleQuietlyAsync(handle).ConfigureAwait(false);
+                Interlocked.Exchange(ref _browser, null);
             }
-            catch (ObjectDisposedException)
+            finally
             {
+                _fallbackLock.Release();
             }
         }
-
-        _context = null;
-        _browser = null;
-        _handle = null;
-        _initLock.Dispose();
+        finally
+        {
+            _initLock.Release();
+        }
     }
 
     public Task<SearchResult> SearchAsync(
@@ -72,40 +84,28 @@ public sealed class CloakBrowserSearchProvider : IWebSearchProvider, IAsyncDispo
         return _engine.SearchAsync(query, maxResults, ct);
     }
 
-    private async Task<Microsoft.Playwright.IPage> GetPageAsync(CancellationToken ct)
+    private async Task<IPage> GetPageAsync(CancellationToken ct)
     {
+        ThrowIfDisposed();
+
         if (_context is not null)
         {
             return await _context.NewPageAsync();
         }
 
-        await _initLock.WaitAsync(ct);
+        await _initLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            ThrowIfDisposed();
             if (_context is not null)
             {
                 return await _context.NewPageAsync();
             }
 
-            _handle = await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = _headless, });
-
+            _handle = await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = _headless });
             _browser = _handle.RawBrowser;
 
-            var ua = BrowserSearchEngine.UserAgents[
-                BrowserSearchEngine.Rng.Next(BrowserSearchEngine.UserAgents.Length)];
-            _context = await _browser.NewContextAsync(
-                           new Microsoft.Playwright.BrowserNewContextOptions
-                               {
-                                   UserAgent = ua,
-                                   Locale = "en-US",
-                                   ViewportSize =
-                                       new Microsoft.Playwright.ViewportSize
-                                           {
-                                               Width = 1920, Height = 1080
-                                           }
-                               });
-
-            // Apply stealth on the context so every page created from it inherits it
+            _context = await _browser.NewContextAsync(CreateContextOptions());
             await _context.AddInitScriptAsync(ContextStealthScript);
 
             return await _context.NewPageAsync();
@@ -114,5 +114,114 @@ public sealed class CloakBrowserSearchProvider : IWebSearchProvider, IAsyncDispo
         {
             _initLock.Release();
         }
+    }
+
+    private async Task<ISearchPageLease> CreateFallbackPageLeaseAsync(CancellationToken ct)
+    {
+        ThrowIfDisposed();
+        await _fallbackLock.WaitAsync(ct).ConfigureAwait(false);
+
+        CloakBrowserHandle? handle = null;
+        IBrowser? browser = null;
+        IBrowserContext? context = null;
+        IPage? page = null;
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+            ThrowIfDisposed();
+            handle = await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = false });
+            browser = handle.RawBrowser;
+            context = await browser.NewContextAsync(CreateContextOptions());
+            await context.AddInitScriptAsync(ContextStealthScript);
+            page = await context.NewPageAsync();
+
+            return new SearchPageLease(
+                page,
+                () => DisposeFallbackResourcesAsync(context, handle),
+                ReleaseFallbackLockAsync);
+        }
+        catch
+        {
+            await ClosePageQuietlyAsync(page).ConfigureAwait(false);
+            await CloseContextQuietlyAsync(context).ConfigureAwait(false);
+            await DisposeHandleQuietlyAsync(handle).ConfigureAwait(false);
+            _fallbackLock.Release();
+            throw;
+        }
+    }
+
+    private ValueTask ReleaseFallbackLockAsync()
+    {
+        _fallbackLock.Release();
+        return ValueTask.CompletedTask;
+    }
+
+    private static BrowserNewContextOptions CreateContextOptions() => new()
+    {
+        UserAgent = BrowserSearchEngine.UserAgents[
+            BrowserSearchEngine.Rng.Next(BrowserSearchEngine.UserAgents.Length)],
+        Locale = "en-US",
+        ViewportSize = new ViewportSize { Width = 1920, Height = 1080 }
+    };
+
+    private static async ValueTask DisposeFallbackResourcesAsync(
+        IBrowserContext? context,
+        CloakBrowserHandle? handle)
+    {
+        await CloseContextQuietlyAsync(context).ConfigureAwait(false);
+        await DisposeHandleQuietlyAsync(handle).ConfigureAwait(false);
+    }
+
+    private static async ValueTask ClosePageQuietlyAsync(IPage? page)
+    {
+        if (page is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await page.CloseAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static async ValueTask CloseContextQuietlyAsync(IBrowserContext? context)
+    {
+        if (context is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await context.CloseAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static async ValueTask DisposeHandleQuietlyAsync(CloakBrowserHandle? handle)
+    {
+        if (handle is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await handle.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
     }
 }

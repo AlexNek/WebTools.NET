@@ -32,6 +32,33 @@ Performs the search in a real Chromium session and extracts results from the
 rendered page. Registered by `AddBrowserServices()` when the Playwright
 engine is selected.
 
+## Headless fallback behavior
+
+Visible-browser fallback is disabled by default because opening a window is an
+explicit application choice. Enable it with
+`enableVisibleSearchFallback: true` on `AddBrowserServices`,
+`PlaywrightSearchProvider`, or `CloakBrowserSearchProvider`.
+
+When enabled for a provider created with `headless: true`, it may make one
+additional search attempt in a temporary visible Chromium browser. This retry
+is started only when both the Bing and DuckDuckGo attempts in the headless
+browser are classified as bot-blocked. It is not started for no results,
+timeouts, ordinary browser/network failures, or markup changes without blocking
+evidence.
+
+The temporary visible browser, context, and page are disposed after the retry.
+Visible fallback work is serialized per provider instance, so concurrent blocked
+searches do not launch unbounded visible browsers. A provider created with
+`headless: false` does not create a second browser. A visible-browser launch
+failure is returned as a failed `SearchResult`; it is not thrown as an unhandled
+browser-resource exception. Cancellation is checked before the fallback begins,
+so an already-canceled request does not open a visible browser.
+
+This behavior requires an environment where a graphical Chromium instance can
+run. Applications that cannot open a visible browser should use the plain HTTP
+provider or leave visible fallback disabled and handle the failed `SearchResult`
+explicitly.
+
 ## CloakBrowserSearchProvider
 
 Same browser-based approach on the CloakBrowser engine with stealth scripts

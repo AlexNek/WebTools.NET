@@ -32,8 +32,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WebTools.NET.ContentAnalysis\WebTools.NET.ContentAnalysis.csproj" />
+    <ProjectReference Include="..\WebTools.NET.ContentAnalysis\WebTools.NET.ContentAnalysis.csproj"
+                      TreatAsPackageReference="false" />
   </ItemGroup>
+
+  <!-- Include the referenced analysis assembly in this package instead of creating a package dependency. -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>
+      $(TargetsForTfmSpecificBuildOutput);IncludeContentAnalysisAssemblyInPackage
+    </TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <Target Name="IncludeContentAnalysisAssemblyInPackage">
+    <ItemGroup>
+      <BuildOutputInPackage Include="$(TargetDir)WebTools.NET.ContentAnalysis.dll" />
+    </ItemGroup>
+  </Target>
 
   <!-- Pack README and icon -->
   <ItemGroup>
