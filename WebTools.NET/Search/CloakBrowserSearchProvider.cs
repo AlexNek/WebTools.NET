@@ -32,15 +32,18 @@ public sealed class CloakBrowserSearchProvider : IWebSearchProvider, IAsyncDispo
 
     public CloakBrowserSearchProvider(
         ILogger<CloakBrowserSearchProvider>? logger = null,
-        bool headless = true)
+        bool headless = true,
+        bool enableVisibleSearchFallback = false)
     {
         _headless = headless;
         _engine = new BrowserSearchEngine(
             GetPageAsync,
             logger,
             "CloakBrowser",
-            headless ? CreateFallbackPageLeaseAsync : null);
+            headless && enableVisibleSearchFallback ? CreateFallbackPageLeaseAsync : null);
     }
+
+    internal bool VisibleFallbackEnabled => _engine.HasFallbackFactory;
 
     public async ValueTask DisposeAsync()
     {
@@ -118,6 +121,7 @@ public sealed class CloakBrowserSearchProvider : IWebSearchProvider, IAsyncDispo
         IPage? page = null;
         try
         {
+            ct.ThrowIfCancellationRequested();
             ThrowIfDisposed();
             handle = await CloakLauncher.LaunchAsync(new LaunchOptions { Headless = false });
             browser = handle.RawBrowser;

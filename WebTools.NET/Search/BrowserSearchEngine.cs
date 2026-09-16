@@ -50,6 +50,8 @@ internal sealed class BrowserSearchEngine
 
     private readonly Func<CancellationToken, Task<ISearchPageLease>>? _getFallbackPageLeaseAsync;
 
+    private readonly Func<int, CancellationToken, Task> _delayAsync;
+
     private readonly Func<CancellationToken, Task<IPage>> _getPageAsync;
 
     private readonly ILogger? _logger;
@@ -58,13 +60,17 @@ internal sealed class BrowserSearchEngine
         Func<CancellationToken, Task<IPage>> getPageAsync,
         ILogger? logger,
         string engineName,
-        Func<CancellationToken, Task<ISearchPageLease>>? getFallbackPageLeaseAsync = null)
+        Func<CancellationToken, Task<ISearchPageLease>>? getFallbackPageLeaseAsync = null,
+        Func<int, CancellationToken, Task>? delayAsync = null)
     {
         _getPageAsync = getPageAsync ?? throw new ArgumentNullException(nameof(getPageAsync));
         _logger = logger;
         _engineName = engineName;
         _getFallbackPageLeaseAsync = getFallbackPageLeaseAsync;
+        _delayAsync = delayAsync ?? ((milliseconds, cancellationToken) => Task.Delay(milliseconds, cancellationToken));
     }
+
+    internal bool HasFallbackFactory => _getFallbackPageLeaseAsync is not null;
 
     internal async Task<SearchResult> SearchAsync(
         string query,
@@ -73,7 +79,7 @@ internal sealed class BrowserSearchEngine
     {
         try
         {
-            await Task.Delay(Rng.Next(PreSearchDelayMinMs, PreSearchDelayMaxMs), ct);
+            await _delayAsync(Rng.Next(PreSearchDelayMinMs, PreSearchDelayMaxMs), ct);
 
             await using var page = await _getPageAsync(ct);
             var primary = await SearchChainAsync(page, query, maxResults, ct);
@@ -141,14 +147,14 @@ internal sealed class BrowserSearchEngine
         int maxResults,
         CancellationToken ct)
     {
-        var bing = await SearchBingAsync(page, query, maxResults);
+        var bing = await SearchBingAsync(page, query, maxResults, ct);
         if (IsUsable(bing.Result))
         {
             return (bing, null, bing.Result);
         }
 
-        await Task.Delay(EngineSwitchDelayMs, ct);
-        var duckDuckGo = await SearchDdgAsync(page, query, maxResults);
+        await _delayAsync(EngineSwitchDelayMs, ct);
+        var duckDuckGo = await SearchDdgAsync(page, query, maxResults, ct);
         if (IsUsable(duckDuckGo.Result))
         {
             return (bing, duckDuckGo, duckDuckGo.Result);
@@ -187,7 +193,8 @@ internal sealed class BrowserSearchEngine
     private async Task<SearchAttemptOutcome> SearchBingAsync(
         IPage page,
         string query,
-        int maxResults)
+        int maxResults,
+        CancellationToken ct)
     {
         try
         {
@@ -213,7 +220,7 @@ internal sealed class BrowserSearchEngine
                     SearchFailureKind.Other);
             }
 
-            await TypeHumanLikeAsync(page, "#sb_form_q", query);
+            await TypeHumanLikeAsync(page, "#sb_form_q", query, ct);
 
             var startUrl = page.Url;
             await page.Keyboard.PressAsync("Enter");
@@ -332,7 +339,8 @@ internal sealed class BrowserSearchEngine
     private async Task<SearchAttemptOutcome> SearchDdgAsync(
         IPage page,
         string query,
-        int maxResults)
+        int maxResults,
+        CancellationToken ct)
     {
         try
         {
@@ -358,7 +366,7 @@ internal sealed class BrowserSearchEngine
                     SearchFailureKind.Other);
             }
 
-            await TypeHumanLikeAsync(page, "#searchbox_input", query);
+            await TypeHumanLikeAsync(page, "#searchbox_input", query, ct);
 
             var startUrl = page.Url;
             await page.Keyboard.PressAsync("Enter");
@@ -561,15 +569,19 @@ internal sealed class BrowserSearchEngine
         }
     }
 
-    private static async Task TypeHumanLikeAsync(IPage page, string selector, string text)
+    private async Task TypeHumanLikeAsync(
+        IPage page,
+        string selector,
+        string text,
+        CancellationToken ct)
     {
         await page.Locator(selector).ClickAsync();
-        await Task.Delay(Rng.Next(TypeStartDelayMinMs, TypeStartDelayMaxMs));
+        await _delayAsync(Rng.Next(TypeStartDelayMinMs, TypeStartDelayMaxMs), ct);
 
         foreach (var ch in text)
         {
             await page.Keyboard.TypeAsync(ch.ToString());
-            await Task.Delay(Rng.Next(TypePauseMinMs, TypePauseMaxMs));
+            await _delayAsync(Rng.Next(TypePauseMinMs, TypePauseMaxMs), ct);
         }
     }
 }

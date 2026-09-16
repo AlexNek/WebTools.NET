@@ -123,7 +123,14 @@ if (result.Success)
 
 For sites behind bot protection, resolve `IWebSearchProvider` from DI instead —
 the browser-based providers type the query into a real search page and scrape
-the rendered results.
+the rendered results. Visible-browser fallback is disabled by default. To opt in,
+pass `enableVisibleSearchFallback: true` when registering browser services. The
+fallback then retries the complete Bing/DuckDuckGo search once in a temporary
+visible browser only when both engines block the headless session. It can open a
+browser window, is serialized per provider, and requires a graphical Chromium
+environment. It does not run for ordinary timeouts, no-results responses, or
+other non-blocking failures; launch failure is returned in the normal failed
+`SearchResult`.
 
 ### Drive a page interactively
 
@@ -264,6 +271,22 @@ services.AddBrowserServices(EBrowserEngine.Playwright, headless: false);
 
 Rule of thumb: use Playwright for normal automation, CloakBrowser when target
 sites detect and block headless browsers.
+
+Visible-browser search fallback is disabled by default. Enable it explicitly:
+
+```csharp
+services.AddBrowserServices(
+    EBrowserEngine.Playwright,
+    enableVisibleSearchFallback: true);
+```
+
+When enabled, the default `headless: true` browser search provider makes one
+temporary visible-browser retry only after both Bing and DuckDuckGo classify the
+headless session as blocked. This may open a window and is not suitable for an
+environment without graphical Chromium support; such a launch failure is
+reported as a failed search result. Set `headless: false` when the primary
+browser should be visible from the start; that mode does not launch a second
+browser.
 
 ## Design Highlights
 

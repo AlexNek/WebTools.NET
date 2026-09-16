@@ -30,15 +30,18 @@ public sealed class PlaywrightSearchProvider : IWebSearchProvider, IAsyncDisposa
 
     public PlaywrightSearchProvider(
         ILogger<PlaywrightSearchProvider>? logger = null,
-        bool headless = true)
+        bool headless = true,
+        bool enableVisibleSearchFallback = false)
     {
         _headless = headless;
         _engine = new BrowserSearchEngine(
             GetPageAsync,
             logger,
             "Playwright",
-            headless ? CreateFallbackPageLeaseAsync : null);
+            headless && enableVisibleSearchFallback ? CreateFallbackPageLeaseAsync : null);
     }
+
+    internal bool VisibleFallbackEnabled => _engine.HasFallbackFactory;
 
     public async ValueTask DisposeAsync()
     {
@@ -121,6 +124,7 @@ public sealed class PlaywrightSearchProvider : IWebSearchProvider, IAsyncDisposa
         IPage? page = null;
         try
         {
+            ct.ThrowIfCancellationRequested();
             ThrowIfDisposed();
             playwright = await Playwright.CreateAsync();
             browser = await playwright.Chromium.LaunchAsync(CreateLaunchOptions(headless: false));
